@@ -17,9 +17,15 @@
  *  RDPProcessList: Processes a DisplayList.
  * ========================================================================= */
 void RDPProcessList(struct RDP *rdp) {
-  unsigned length = rdp->regs[DPC_END_REG] - rdp->regs[DPC_START_REG];
+  int start = rdp->regs[DPC_START_REG];
+  int end = rdp->regs[DPC_END_REG];
+
   debugarg("Processing display list at: [0x%.8X].", rdp->regs[DPC_START_REG]);
-  debugarg("Display list has length: [%u].", length);
+  debugarg("Display list has length: [%d].", end - start);
+
+  /* ??? Okay... */
+  if ((end - start) < 0)
+    return;
 
   /* For now, just cheat and draw in one pass. */
   rdp->regs[DPC_CURRENT_REG] = rdp->regs[DPC_END_REG];

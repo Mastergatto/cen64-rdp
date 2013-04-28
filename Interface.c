@@ -27,8 +27,8 @@ DPRegRead(void *_rdp, uint32_t address, void *_data) {
   enum DPRegister reg = (enum DPRegister) (address / 4);
 
   debugarg("DPRegRead: Reading from register [%s].", DPRegisterMnemonics[reg]);
-
   *data = rdp->regs[reg];
+
   return 0;
 }
 
@@ -44,7 +44,6 @@ DPRegWrite(void *_rdp, uint32_t address, void *_data) {
   enum DPRegister reg = (enum DPRegister) (address / 4);
 
   debugarg("DPRegWrite: Writing to register [%s].", DPRegisterMnemonics[reg]);
-  debugarg("DPRegWrite: Wrote: [0x%.8X].", *data);
   rdp->regs[reg] = *data;
 
   if (reg == DPC_END_REG)
