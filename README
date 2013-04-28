@@ -1,0 +1,9 @@
+==============================================================================
+ RDPSIM: A cycle-accurate Reality Display Processor (RSP) simulator.
+==============================================================================
+
+As it stands, this is not actually cycle-accurate; it only aims to be pixel-
+accurate. Since there are so many untested components in the console, and this
+is one of the most (if not, most) complex, revisiting it at a later time will
+aid implementation. It'll also get a working product out the door faster.
+

@@ -1,23 +1,19 @@
 /* ============================================================================
- *  Externs.h: External definitions for the RDP plugin.
+ *  Definitions.h: Reality Display Processor (RDP) Defines.
  *
- *  RDPSIM: Reality Display Processor SIMulator.
+ *  RSPSIM: Reality Signal Processor SIMulator.
  *  Copyright (C) 2013, Tyler J. Stachecki.
  *  All rights reserved.
  *
  *  This file is subject to the terms and conditions defined in
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
-#ifndef __RDP__EXTERNS_H__
-#define __RDP__EXTERNS_H__
+#ifndef __RDP__DEFINITIONS_H__
+#define __RDP__DEFINITIONS_H__
 #include "Common.h"
 
-struct BusController;
-struct RDP;
-
-void BusClearRCPInterrupt(struct BusController *, unsigned);
-void BusRaiseRCPInterrupt(struct BusController *, unsigned);
-void ConnectRDPToBus(struct RDP *rdp, struct BusController *bus);
+/* MI_INTR_REG bits. */
+#define MI_INTR_DP                0x20
 
 #endif
 
