@@ -1,0 +1,7 @@
+# Compiler speak.
+librdp.a
+*.o
+
+# Swap files.
+*.swp
+
