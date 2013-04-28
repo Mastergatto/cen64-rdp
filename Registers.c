@@ -1,5 +1,5 @@
 /* ============================================================================
- *  Interface.h: Reality Display Processor (RDP) Interface.
+ *  Registers.c: Reality Display Processor (RDP) Registers.
  *
  *  RDPSIM: Reality Signal Processor SIMulator.
  *  Copyright (C) 2013, Tyler J. Stachecki.
@@ -8,12 +8,16 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
-#ifndef __RDP__INTERFACE_H__
-#define __RDP__INTERFACE_H__
-#include "Common.h"
+#include "Registers.h"
 
-int DPRegRead(void *, uint32_t, void *);
-int DPRegWrite(void *, uint32_t, void *);
-
+/* ============================================================================
+ *  Mnemonics table.
+ * ========================================================================= */
+#ifndef NDEBUG
+const char *DPRegisterMnemonics[NUM_DP_REGISTERS] = {
+#define X(reg) #reg,
+#include "Registers.md"
+#undef X
+};
 #endif
 
