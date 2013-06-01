@@ -12,6 +12,12 @@
 #define __RDP__EXTERNS_H__
 #include "Common.h"
 
+#ifdef __cplusplus
+#include <cstddef>
+#else
+#include <stddef.h>
+#endif
+
 struct BusController;
 struct RDP;
 
