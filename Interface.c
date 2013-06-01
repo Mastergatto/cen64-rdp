@@ -46,7 +46,10 @@ DPRegWrite(void *_rdp, uint32_t address, void *_data) {
   debugarg("DPRegWrite: Writing to register [%s].", DPRegisterMnemonics[reg]);
   rdp->regs[reg] = *data;
 
-  if (reg == DPC_END_REG)
+  if (reg == DPC_START_REG)
+    rdp->regs[DPC_CURRENT_REG] = *data;
+
+  else if (reg == DPC_END_REG)
     RDPProcessList(rdp);
 
   return 0;

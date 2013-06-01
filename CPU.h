@@ -16,6 +16,9 @@
 struct RDP {
   struct BusController *bus;
   uint32_t regs[NUM_DP_REGISTERS];
+
+  uint32_t cmdBuffer[0x1000];
+  unsigned cmdPtr, cmdCur;
 };
 
 struct RDP *CreateRDP(void);

@@ -15,9 +15,15 @@
 struct BusController;
 struct RDP;
 
+uint32_t BusReadWord(struct BusController *, uint32_t);
+void BusWriteWord(const struct BusController *, uint32_t, uint32_t);
+
 void BusClearRCPInterrupt(struct BusController *, unsigned);
 void BusRaiseRCPInterrupt(struct BusController *, unsigned);
 void ConnectRDPToBus(struct RDP *rdp, struct BusController *bus);
+
+void DMAFromDRAM(struct BusController *, void *, uint32_t, uint32_t);
+void DMAToDRAM(struct BusController *, uint32_t, const void *, size_t);
 
 #endif
 

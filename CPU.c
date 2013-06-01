@@ -60,5 +60,9 @@ static void
 InitRDP(struct RDP *rdp) {
   debug("Initializing CPU.");
   memset(rdp, 0, sizeof(*rdp));
+
+  rdp->regs[DPC_STATUS_REG] |= 0x008; /* GCLK is alive. */
+  rdp->regs[DPC_STATUS_REG] |= 0x020; /* RDP PIPELINE is busy. */
+  rdp->regs[DPC_STATUS_REG] |= 0x080; /* RDP COMMAND buffer is ready. */
 }
 
