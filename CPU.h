@@ -32,6 +32,13 @@ struct RDPCombine {
   uint8_t addA1;
 };
 
+struct RDPMiscState {
+  uint32_t fbAddress;
+  uint32_t fbWidth;
+  uint8_t fbFormat;
+  uint8_t fbSize;
+};
+
 struct RDPOtherModes {
   uint8_t cycleType;
   uint8_t perspTexEn;
@@ -86,8 +93,10 @@ struct RDP {
   unsigned cmdPtr, cmdCur;
 
   struct RDPScissor scissor;
+  struct RDPMiscState miscState;
   struct RDPOtherModes otherModes;
   struct RDPCombine combine;
+  uint32_t fillColor;
 };
 
 struct RDP *CreateRDP(void);

@@ -106,6 +106,22 @@ static void RDPFullSync(struct RDP *rdp,
 }
 
 /* ============================================================================
+ *  Command: SetColorImage.
+ * ========================================================================= */
+static void RDPSetColorImage(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
+  struct RDPMiscState *miscState = &rdp->miscState;
+
+  miscState->fbFormat = arg1 >> 21 & 0x7;
+  miscState->fbSize = arg1 >> 19 & 0x3;
+  miscState->fbWidth = (arg1 & 0x3FF) + 1;
+  miscState->fbAddress = arg2 & 0x01FFFFFF;
+
+  /* Jet Force Gemini attempts to set fbFormat to 4? */
+  if (miscState->fbFormat < 2 || miscState->fbFormat > 32)
+    miscState->fbFormat = 2;
+}
+
+/* ============================================================================
  *  Command: SetCombine.
  * ========================================================================= */
 static void RDPSetCombine(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
@@ -127,6 +143,14 @@ static void RDPSetCombine(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
   combine->addRgb1 = arg2 >> 6 & 0x7;
   combine->subBa1 = arg2 >> 3 & 0x7;
   combine->addA1 = arg2 >> 0 & 0x7;
+}
+
+/* ============================================================================
+ *  Command: SetFillColor32.
+ * ========================================================================= */
+static void RDPSetFillColor32(struct RDP *rdp,
+  uint32_t unused(arg1), uint32_t arg2) {
+  rdp->fillColor = arg2;
 }
 
 /* ============================================================================
@@ -251,7 +275,9 @@ void RDPProcessList(struct RDP *rdp) {
     case 0x29: RDPFullSync(rdp, arg1, arg2); break;
     case 0x2D: RDPSetScissor(rdp, arg1, arg2); break;
     case 0x2F: RDPSetOtherModes(rdp, arg1, arg2); break;
+    case 0x37: RDPSetFillColor32(rdp, arg1, arg2); break;
     case 0x3C: RDPSetCombine(rdp, arg1, arg2); break;
+    case 0x3F: RDPSetColorImage(rdp, arg1, arg2); break;
 
     default:
       debugarg("Unimplemented command: 0x%.2X.", cmd);
