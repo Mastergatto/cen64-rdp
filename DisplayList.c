@@ -130,18 +130,6 @@ static void RDPSetCombine(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
 }
 
 /* ============================================================================
- *  Command: SetScissor.
- * ========================================================================= */
-static void RDPSetScissor(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
-  struct RDPScissor *scissor = &rdp->scissor;
-
-  scissor->xh = ((arg1 >> 12) & 0xFFF) >> 2;
-  scissor->yh = ((arg1 >>  0) & 0xFFF) >> 2;
-  scissor->xl = ((arg2 >> 12) & 0xFFF) >> 2;
-  scissor->xl = ((arg2 >>  0) & 0xFFF) >> 2;
-}
-
-/* ============================================================================
  *  Command: SetOtherModes.
  * ========================================================================= */
 static void RDPSetOtherModes(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
@@ -183,6 +171,26 @@ static void RDPSetOtherModes(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
   otherModes->zSourceSel = arg2 >> 2 & 0x1;
   otherModes->ditherAlphaEn = arg2 >> 1 & 0x1;
   otherModes->alphaCompareEn = arg2 >> 0 & 0x1;
+}
+
+/* ============================================================================
+ *  Command: SetScissor.
+ * ========================================================================= */
+static void RDPSetScissor(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
+  struct RDPScissor *scissor = &rdp->scissor;
+
+  scissor->xh = ((arg1 >> 12) & 0xFFF) >> 2;
+  scissor->yh = ((arg1 >>  0) & 0xFFF) >> 2;
+  scissor->xl = ((arg2 >> 12) & 0xFFF) >> 2;
+  scissor->xl = ((arg2 >>  0) & 0xFFF) >> 2;
+}
+
+/* ============================================================================
+ *  Command: SyncPipe.
+ * ========================================================================= */
+static void RDPSyncPipe(struct RDP *unused(rdp),
+  uint32_t unused(arg1), uint32_t unused(arg2)) {
+  debug("Synchronize pipeline.");
 }
 
 /* ============================================================================
@@ -239,6 +247,7 @@ void RDPProcessList(struct RDP *rdp) {
     /*  Execute command here...  */
     /* ========================= */
     switch(cmd) {
+    case 0x27: RDPSyncPipe(rdp, arg1, arg2); break;
     case 0x29: RDPFullSync(rdp, arg1, arg2); break;
     case 0x2D: RDPSetScissor(rdp, arg1, arg2); break;
     case 0x2F: RDPSetOtherModes(rdp, arg1, arg2); break;
