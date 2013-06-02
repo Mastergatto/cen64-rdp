@@ -11,7 +11,8 @@
  *  Most of this file is a direct rip of MAME/MESS's N64 software renderer.
  *  When the project stablizes more, this project will eventually be replaced
  *  with cycle-accurate components. Until then, hats off to the MAME/MESS
- *  team.
+ *  team. Also note that those portions of the code are covered under the MAME
+ *  license, NOT the BSD license.
  * ========================================================================= */
 #include "CPU.h"
 #include "Definitions.h"
@@ -19,8 +20,10 @@
 #include "Registers.h"
 
 #ifdef __cplusplus
+#include <cassert>
 #include <cstring>
 #else
+#include <assert.h>
 #include <string.h>
 #endif
 
@@ -95,11 +98,55 @@ static const unsigned CommandLengthLUT[64] = {
 };
 
 /* ============================================================================
- *  Command: RDPFullSync.
+ *  Command: FullSync.
  * ========================================================================= */
 static void RDPFullSync(struct RDP *rdp,
   uint32_t unused(arg1), uint32_t unused(arg2)) {
   BusRaiseRCPInterrupt(rdp->bus, MI_INTR_DP);
+}
+
+/* ============================================================================
+ *  Command: SetOtherModes.
+ * ========================================================================= */
+static void RDPSetOtherModes(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
+  struct RDPOtherModes *otherModes = &rdp->otherModes;
+
+  otherModes->cycleType = arg1 >> 20 & 0x3;
+  otherModes->perspTexEn = arg1 >> 19 & 0x1;
+  otherModes->detailTexEn = arg1 >> 18 & 0x1;
+  otherModes->sharpenTexEn = arg1 >> 17 & 0x1;
+  otherModes->texLodEn = arg1 >> 16 & 0x1;
+  otherModes->enTlut = arg1 >> 15 & 0x1;
+  otherModes->tlutType = arg1 >> 14 & 0x1;
+  otherModes->sampleType = arg1 >> 13 & 0x1;
+  otherModes->midTexel = arg1 >> 12 & 0x1;
+  otherModes->biLerp0 = arg1 >> 11 & 0x1;
+  otherModes->biLerp1 = arg1 >> 10 & 0x1;
+  otherModes->convertOne = arg1 >> 9 & 0x1;
+  otherModes->keyEn = arg1 >> 8 & 0x1;
+  otherModes->rgbDitherSel = arg1 >> 6 & 0x3;
+  otherModes->alphaDitherSel = arg1 >> 4 & 0x3;
+  otherModes->blendm1a0 = arg2 >> 30 & 0x3;
+  otherModes->blendm1a1 = arg2 >> 28 & 0x3;
+  otherModes->blendm1b0 = arg2 >> 26 & 0x3;
+  otherModes->blendm1b1 = arg2 >> 24 & 0x3;
+  otherModes->blendm2a0 = arg2 >> 22 & 0x3;
+  otherModes->blendm2a1 = arg2 >> 20 & 0x3;
+  otherModes->blendm2b0 = arg2 >> 18 & 0x3;
+  otherModes->blendm2b1 = arg2 >> 16 & 0x3;
+  otherModes->forceBlend = arg2 >> 14 & 0x1;
+  otherModes->alphaCvgSelect = arg2 >> 13 & 0x1;
+  otherModes->cvgTimesAlpha = arg2 >> 12 & 0x1;
+  otherModes->zMode = arg2 >> 10 & 0x3;
+  otherModes->cvgDest = arg2 >> 8 & 0x3;
+  otherModes->colorOnCvg = arg2 >> 7 & 0x1;
+  otherModes->imageReadEn = arg2 >> 6 & 0x1;
+  otherModes->zUpdateEn = arg2 >> 5 & 0x1;
+  otherModes->zCompareEn = arg2 >> 4 & 0x1;
+  otherModes->antialiasEn = arg2 >> 3 & 0x1;
+  otherModes->zSourceSel = arg2 >> 2 & 0x1;
+  otherModes->ditherAlphaEn = arg2 >> 1 & 0x1;
+  otherModes->alphaCompareEn = arg2 >> 0 & 0x1;
 }
 
 /* ============================================================================
@@ -160,8 +207,13 @@ void RDPProcessList(struct RDP *rdp) {
       RDPFullSync(rdp, arg1, arg2);
       break;
 
+    case 0x2F:
+      RDPSetOtherModes(rdp, arg1, arg2);
+      break;
+
     default:
       debugarg("Unimplemented command: 0x%.2X.", cmd);
+      assert(0);
       break;
     }
 

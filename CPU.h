@@ -13,12 +13,53 @@
 #include "Externs.h"
 #include "Registers.h"
 
+struct RDPOtherModes {
+  uint8_t cycleType;
+  uint8_t perspTexEn;
+  uint8_t detailTexEn;
+  uint8_t sharpenTexEn;
+  uint8_t texLodEn;
+  uint8_t enTlut;
+  uint8_t tlutType;
+  uint8_t sampleType;
+  uint8_t midTexel;
+  uint8_t biLerp0;
+  uint8_t biLerp1;
+  uint8_t convertOne;
+  uint8_t keyEn;
+  uint8_t rgbDitherSel;
+  uint8_t alphaDitherSel;
+  uint8_t blendm1a0;
+  uint8_t blendm1a1;
+  uint8_t blendm1b0;
+  uint8_t blendm1b1;
+  uint8_t blendm2a0;
+  uint8_t blendm2a1;
+  uint8_t blendm2b0;
+  uint8_t blendm2b1;
+  uint8_t forceBlend;
+  uint8_t alphaCvgSelect;
+  uint8_t cvgTimesAlpha;
+  uint8_t zMode;
+  uint8_t cvgDest;
+  uint8_t colorOnCvg;
+  uint8_t imageReadEn;
+  uint8_t zUpdateEn;
+  uint8_t zCompareEn;
+  uint8_t antialiasEn;
+  uint8_t zSourceSel;
+  uint8_t ditherAlphaEn;
+  uint8_t alphaCompareEn;
+};
+
 struct RDP {
   struct BusController *bus;
   uint32_t regs[NUM_DP_REGISTERS];
 
   uint32_t cmdBuffer[0x1000];
   unsigned cmdPtr, cmdCur;
+
+  struct RDPOtherModes otherModes;
 };
 
 struct RDP *CreateRDP(void);
