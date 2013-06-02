@@ -95,6 +95,14 @@ static const unsigned CommandLengthLUT[64] = {
 };
 
 /* ============================================================================
+ *  Command: RDPFullSync.
+ * ========================================================================= */
+static void RDPFullSync(struct RDP *rdp,
+  uint32_t unused(arg1), uint32_t unused(arg2)) {
+  BusRaiseRCPInterrupt(rdp->bus, MI_INTR_DP);
+}
+
+/* ============================================================================
  *  RDPProcessList: Processes a DisplayList.
  * ========================================================================= */
 void RDPProcessList(struct RDP *rdp) {
@@ -105,8 +113,8 @@ void RDPProcessList(struct RDP *rdp) {
 
   unsigned cmd, cmdLength;
 
-  debugarg("Processing display list at: [0x%.8X].", rdp->regs[DPC_CURRENT_REG]);
-  debugarg("Display list has length: [%d].", end - start);
+  debugarg("Processing display list at: [0x%.8X].",
+    rdp->regs[DPC_CURRENT_REG]);
 
   /* Look into this ? */
   if (unlikely(length < 0)) {
@@ -118,7 +126,7 @@ void RDPProcessList(struct RDP *rdp) {
   debug("[HACK]: Reading display list from RDRAM.");
 
   for (i = 0; i < length; i += 4) {
-    uint32_t word = BusReadWord(rdp->bus, start + i);
+    uint32_t word = BusReadWord(rdp->bus, rdp->regs[DPC_CURRENT_REG] + i);
     memcpy(rdp->cmdBuffer + rdp->cmdPtr, &word, sizeof(word));
     rdp->cmdPtr++;
   }
@@ -133,19 +141,29 @@ void RDPProcessList(struct RDP *rdp) {
 
   /* Process as many commands as possible. */
   while (rdp->cmdCur < rdp->cmdPtr) {
-    uint32_t commandArg1, commandArg2;
+    uint32_t arg1, arg2;
+
     cmd = (rdp->cmdBuffer[rdp->cmdCur] >> 24) & 0x3F;
 
     /* Do we need more data? */
     if (((rdp->cmdPtr - rdp->cmdCur) * 4) < CommandLengthLUT[cmd])
       return;
 
-    commandArg1 = rdp->cmdBuffer[rdp->cmdCur];
-    commandArg2 = rdp->cmdBuffer[rdp->cmdCur+1];
+    arg1 = rdp->cmdBuffer[rdp->cmdCur];
+    arg2 = rdp->cmdBuffer[rdp->cmdCur+1];
 
     /* ========================= */
     /*  Execute command here...  */
     /* ========================= */
+    switch(cmd) {
+    case 0x29:
+      RDPFullSync(rdp, arg1, arg2);
+      break;
+
+    default:
+      debugarg("Unimplemented command: 0x%.2X.", cmd);
+      break;
+    }
 
     rdp->cmdCur += CommandLengthLUT[cmd] / 4;
   }
