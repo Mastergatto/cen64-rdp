@@ -52,6 +52,13 @@ struct RDPOtherModes {
   uint8_t alphaCompareEn;
 };
 
+struct RDPScissor {
+  uint32_t xh;
+  uint32_t yh;
+  uint32_t xl;
+  uint32_t yl;
+};
+
 struct RDP {
   struct BusController *bus;
   uint32_t regs[NUM_DP_REGISTERS];
@@ -59,6 +66,7 @@ struct RDP {
   uint32_t cmdBuffer[0x1000];
   unsigned cmdPtr, cmdCur;
 
+  struct RDPScissor scissor;
   struct RDPOtherModes otherModes;
 };
 

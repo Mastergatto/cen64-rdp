@@ -106,6 +106,18 @@ static void RDPFullSync(struct RDP *rdp,
 }
 
 /* ============================================================================
+ *  Command: SetScissor.
+ * ========================================================================= */
+static void RDPSetScissor(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
+  struct RDPScissor *scissor = &rdp->scissor;
+
+  scissor->xh = ((arg1 >> 12) & 0xFFF) >> 2;
+  scissor->yh = ((arg1 >>  0) & 0xFFF) >> 2;
+  scissor->xl = ((arg2 >> 12) & 0xFFF) >> 2;
+  scissor->xl = ((arg2 >>  0) & 0xFFF) >> 2;
+}
+
+/* ============================================================================
  *  Command: SetOtherModes.
  * ========================================================================= */
 static void RDPSetOtherModes(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
@@ -203,13 +215,9 @@ void RDPProcessList(struct RDP *rdp) {
     /*  Execute command here...  */
     /* ========================= */
     switch(cmd) {
-    case 0x29:
-      RDPFullSync(rdp, arg1, arg2);
-      break;
-
-    case 0x2F:
-      RDPSetOtherModes(rdp, arg1, arg2);
-      break;
+    case 0x29: RDPFullSync(rdp, arg1, arg2); break;
+    case 0x2D: RDPSetScissor(rdp, arg1, arg2); break;
+    case 0x2F: RDPSetOtherModes(rdp, arg1, arg2); break;
 
     default:
       debugarg("Unimplemented command: 0x%.2X.", cmd);
