@@ -13,6 +13,25 @@
 #include "Externs.h"
 #include "Registers.h"
 
+struct RDPCombine {
+  uint8_t subArgb0;
+  uint8_t mulRgb0;
+  uint8_t subAa0;
+  uint8_t mulA0;
+  uint8_t subArgb1;
+  uint8_t mulRgb1;
+  uint8_t subBrgb0;
+  uint8_t subBrgb1;
+  uint8_t subAa1;
+  uint8_t mulA1;
+  uint8_t addRgb0;
+  uint8_t subBa0;
+  uint8_t addA0;
+  uint8_t addRgb1;
+  uint8_t subBa1;
+  uint8_t addA1;
+};
+
 struct RDPOtherModes {
   uint8_t cycleType;
   uint8_t perspTexEn;
@@ -68,6 +87,7 @@ struct RDP {
 
   struct RDPScissor scissor;
   struct RDPOtherModes otherModes;
+  struct RDPCombine combine;
 };
 
 struct RDP *CreateRDP(void);

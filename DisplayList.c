@@ -31,70 +31,70 @@
  *  List of display commands, and their lengths.
  * ========================================================================= */
 static const unsigned CommandLengthLUT[64] = {
-  8,          // 0x00, No Op
-  8,          // 0x01, ???
-  8,          // 0x02, ???
-  8,          // 0x03, ???
-  8,          // 0x04, ???
-  8,          // 0x05, ???
-  8,          // 0x06, ???
-  8,          // 0x07, ???
-  32,         // 0x08, Non-Shaded Triangle
-  32+16,      // 0x09, Non-Shaded, Z-Buffered Triangle
-  32+64,      // 0x0a, Textured Triangle
-  32+64+16,   // 0x0b, Textured, Z-Buffered Triangle
-  32+64,      // 0x0c, Shaded Triangle
-  32+64+16,   // 0x0d, Shaded, Z-Buffered Triangle
-  32+64+64,   // 0x0e, Shaded+Textured Triangle
-  32+64+64+16,// 0x0f, Shaded+Textured, Z-Buffered Triangle
-  8,          // 0x10, ???
-  8,          // 0x11, ???
-  8,          // 0x12, ???
-  8,          // 0x13, ???
-  8,          // 0x14, ???
-  8,          // 0x15, ???
-  8,          // 0x16, ???
-  8,          // 0x17, ???
-  8,          // 0x18, ???
-  8,          // 0x19, ???
-  8,          // 0x1a, ???
-  8,          // 0x1b, ???
-  8,          // 0x1c, ???
-  8,          // 0x1d, ???
-  8,          // 0x1e, ???
-  8,          // 0x1f, ???
-  8,          // 0x20, ???
-  8,          // 0x21, ???
-  8,          // 0x22, ???
-  8,          // 0x23, ???
-  16,         // 0x24, Texture_Rectangle
-  16,         // 0x25, Texture_Rectangle_Flip
-  8,          // 0x26, Sync_Load
-  8,          // 0x27, Sync_Pipe
-  8,          // 0x28, Sync_Tile
-  8,          // 0x29, Sync_Full
-  8,          // 0x2a, Set_Key_GB
-  8,          // 0x2b, Set_Key_R
-  8,          // 0x2c, Set_Convert
-  8,          // 0x2d, Set_Scissor
-  8,          // 0x2e, Set_Prim_Depth
-  8,          // 0x2f, Set_Other_Modes
-  8,          // 0x30, Load_TLUT
-  8,          // 0x31, ???
-  8,          // 0x32, Set_Tile_Size
-  8,          // 0x33, Load_Block
-  8,          // 0x34, Load_Tile
-  8,          // 0x35, Set_Tile
-  8,          // 0x36, Fill_Rectangle
-  8,          // 0x37, Set_Fill_Color
-  8,          // 0x38, Set_Fog_Color
-  8,          // 0x39, Set_Blend_Color
-  8,          // 0x3a, Set_Prim_Color
-  8,          // 0x3b, Set_Env_Color
-  8,          // 0x3c, Set_Combine
-  8,          // 0x3d, Set_Texture_Image
-  8,          // 0x3e, Set_Mask_Image
-  8           // 0x3f, Set_Color_Image
+  8,          /* 0x00, No Op */
+  8,          /* 0x01, ??? */
+  8,          /* 0x02, ??? */
+  8,          /* 0x03, ??? */
+  8,          /* 0x04, ??? */
+  8,          /* 0x05, ??? */
+  8,          /* 0x06, ??? */
+  8,          /* 0x07, ??? */
+  32,         /* 0x08, Non-Shaded Triangle */
+  32+16,      /* 0x09, Non-Shaded, Z-Buffered Triangle */
+  32+64,      /* 0x0a, Textured Triangle */
+  32+64+16,   /* 0x0b, Textured, Z-Buffered Triangle */
+  32+64,      /* 0x0c, Shaded Triangle */
+  32+64+16,   /* 0x0d, Shaded, Z-Buffered Triangle */
+  32+64+64,   /* 0x0e, Shaded+Textured Triangle */
+  32+64+64+16,/* 0x0f, Shaded+Textured, Z-Buffered Triangle */
+  8,          /* 0x10, ??? */
+  8,          /* 0x11, ??? */
+  8,          /* 0x12, ??? */
+  8,          /* 0x13, ??? */
+  8,          /* 0x14, ??? */
+  8,          /* 0x15, ??? */
+  8,          /* 0x16, ??? */
+  8,          /* 0x17, ??? */
+  8,          /* 0x18, ??? */
+  8,          /* 0x19, ??? */
+  8,          /* 0x1a, ??? */
+  8,          /* 0x1b, ??? */
+  8,          /* 0x1c, ??? */
+  8,          /* 0x1d, ??? */
+  8,          /* 0x1e, ??? */
+  8,          /* 0x1f, ??? */
+  8,          /* 0x20, ??? */
+  8,          /* 0x21, ??? */
+  8,          /* 0x22, ??? */
+  8,          /* 0x23, ??? */
+  16,         /* 0x24, Texture_Rectangle */
+  16,         /* 0x25, Texture_Rectangle_Flip */
+  8,          /* 0x26, Sync_Load */
+  8,          /* 0x27, Sync_Pipe */
+  8,          /* 0x28, Sync_Tile */
+  8,          /* 0x29, Sync_Full */
+  8,          /* 0x2a, Set_Key_GB */
+  8,          /* 0x2b, Set_Key_R */
+  8,          /* 0x2c, Set_Convert */
+  8,          /* 0x2d, Set_Scissor */
+  8,          /* 0x2e, Set_Prim_Depth */
+  8,          /* 0x2f, Set_Other_Modes */
+  8,          /* 0x30, Load_TLUT */
+  8,          /* 0x31, ??? */
+  8,          /* 0x32, Set_Tile_Size */
+  8,          /* 0x33, Load_Block */
+  8,          /* 0x34, Load_Tile */
+  8,          /* 0x35, Set_Tile */
+  8,          /* 0x36, Fill_Rectangle */
+  8,          /* 0x37, Set_Fill_Color */
+  8,          /* 0x38, Set_Fog_Color */
+  8,          /* 0x39, Set_Blend_Color */
+  8,          /* 0x3a, Set_Prim_Color */
+  8,          /* 0x3b, Set_Env_Color */
+  8,          /* 0x3c, Set_Combine */
+  8,          /* 0x3d, Set_Texture_Image */
+  8,          /* 0x3e, Set_Mask_Image */
+  8           /* 0x3f, Set_Color_Image */
 };
 
 /* ============================================================================
@@ -103,6 +103,30 @@ static const unsigned CommandLengthLUT[64] = {
 static void RDPFullSync(struct RDP *rdp,
   uint32_t unused(arg1), uint32_t unused(arg2)) {
   BusRaiseRCPInterrupt(rdp->bus, MI_INTR_DP);
+}
+
+/* ============================================================================
+ *  Command: SetCombine.
+ * ========================================================================= */
+static void RDPSetCombine(struct RDP *rdp, uint32_t arg1, uint32_t arg2) {
+  struct RDPCombine *combine = &rdp->combine;
+
+  combine->subArgb0 = arg1 >> 20 & 0xF;
+  combine->mulRgb0 = arg1 >> 15 & 0x1F;
+  combine->subAa0 = arg1 >> 12 & 0x7;
+  combine->mulA0 = arg1 >> 9 & 0x7;
+  combine->subArgb1 = arg1 >> 5 & 0xF;
+  combine->mulRgb1 = arg1 >> 0 & 0x1F;
+  combine->subBrgb0 = arg2 >> 28 & 0xF;
+  combine->subBrgb1 = arg2 >> 24 & 0xF;
+  combine->subAa1 = arg2 >> 21 & 0x7;
+  combine->mulA1 = arg2 >> 18 & 0x7;
+  combine->addRgb0 = arg2 >> 15 & 0x7;
+  combine->subBa0 = arg2 >> 12 & 0x7;
+  combine->addA0 = arg2 >> 9 & 0x7;
+  combine->addRgb1 = arg2 >> 6 & 0x7;
+  combine->subBa1 = arg2 >> 3 & 0x7;
+  combine->addA1 = arg2 >> 0 & 0x7;
 }
 
 /* ============================================================================
@@ -218,6 +242,7 @@ void RDPProcessList(struct RDP *rdp) {
     case 0x29: RDPFullSync(rdp, arg1, arg2); break;
     case 0x2D: RDPSetScissor(rdp, arg1, arg2); break;
     case 0x2F: RDPSetOtherModes(rdp, arg1, arg2); break;
+    case 0x3C: RDPSetCombine(rdp, arg1, arg2); break;
 
     default:
       debugarg("Unimplemented command: 0x%.2X.", cmd);
