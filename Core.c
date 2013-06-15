@@ -9,6 +9,9 @@
  *  file 'MAMELICENSE', which is part of this source code package.
  * ========================================================================= */
 #include "Common.h"
+#include "Core.h"
+#include "CPU.h"
+#include "Definitions.h"
 #include "NormalROM.h"
 #include <stdarg.h>
 #include <stddef.h>
@@ -16,8 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern GFX_INFO gfx;
-
+#define LOG_RDP_EXECUTION 0
+#define DETAILED_LOGGING 0
 
 #define SIGN16(x)  ((int16_t)(x))
 #define SIGN8(x)  ((int8_t)(x))
@@ -25,52 +28,30 @@ extern GFX_INFO gfx;
 #define SIGN(x, numb)  (((x) & ((1 << numb) - 1)) | -((x) & (1 << (numb - 1))))
 #define SIGNF(x, numb)  ((x) | -((x) & (1 << (numb - 1))))
 
-
-
-
 #define GET_LOW(x)  (((x) & 0x3e) << 2)
 #define GET_MED(x)  (((x) & 0x7c0) >> 3)
 #define GET_HI(x)  (((x) >> 8) & 0xf8)
-
 
 #define GET_LOW_RGBA16_TMEM(x)  (replicated_rgba[((x) >> 1) & 0x1f])
 #define GET_MED_RGBA16_TMEM(x)  (replicated_rgba[((x) >> 6) & 0x1f])
 #define GET_HI_RGBA16_TMEM(x)  (replicated_rgba[((x) >> 11) & 0x1f])
 
-static void fatalerror(const char * err, ...)
-{
-  char VsprintfBuffer[200];
+/* This kind of message should be passed upwards. */
+static void fatalerror(const char *fmt, ...) {
   va_list arg;
-  va_start(arg, err);
-  vsprintf(VsprintfBuffer, err, arg);
-#ifdef WIN32
-  MessageBoxA(0,VsprintfBuffer,"RDP: fatal error",MB_OK);
-#endif
-#ifndef WIN32
-  printf(VsprintfBuffer);
-#endif
+  va_start(arg, fmt);
+  vfprintf(stderr, fmt, arg);
   va_end(arg);
-  exit(0);
+
+  exit(EXIT_FAILURE);
 }
 
-static void stricterror(const char* err, ...)
-{
-  char VsprintfBuffer[200];
+static void stricterror(const char *fmt, ...) {
   va_list arg;
-  va_start(arg, err);
-  vsprintf(VsprintfBuffer, err, arg);
-#ifdef WIN32
-  MessageBoxA(0,VsprintfBuffer,"RDP: warning",MB_OK);
-#endif
-#ifndef WIN32
-  printf(VsprintfBuffer);
-#endif
+  va_start(arg, fmt);
+  vfprintf(stderr, fmt, arg);
   va_end(arg);
 }
-
-
-#define LOG_RDP_EXECUTION 0
-#define  DETAILED_LOGGING 0
 
 FILE *rdp_exec;
 
@@ -78,8 +59,6 @@ uint32_t rdp_cmd_data[0x10000];
 uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
 uint32_t ptr_onstart = 0;
-
-extern FILE* zeldainfo;
 
 uint32_t curpixel_cvg = 0;
 uint32_t curpixel_cvbit = 0;
@@ -104,6 +83,24 @@ uint8_t* _rdram_8;
 uint16_t* _rdram_16;
 uint32_t brightness = 0;
 int32_t iseed = 1;
+
+static uint8_t* rdram;
+static uint8_t* rsp_dmem;
+
+/* TYLER: Temporary hack. */
+static struct RDP *my_rdp;
+static uint32_t *vi_width;
+
+void RDPSetVIWidthPointer(uint32_t *vi_width_ptr) {
+  vi_width = vi_width_ptr;
+}
+
+void RDPSetRDRAMPointer(uint8_t *rdram_ptr) {
+  rdram = rdram_ptr;
+}
+void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
+  rsp_dmem = rsp_dmem_ptr;
+}
 
 typedef struct
 {
@@ -489,7 +486,9 @@ static void restore_filter16(int* r, int* g, int* b, uint32_t fboffset, uint32_t
 static void restore_filter32(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres);
 static void gamma_filters(int* r, int* g, int* b, int gamma_and_dither);
 static void adjust_brightness(int* r, int* g, int* b, int brightcoeff);
+#if 0
 static void clearscreen(uint32_t x0,uint32_t y0, uint32_t x1, uint32_t y1, uint32_t white);
+#endif
 static void clearfb16(uint16_t* fb, uint32_t width,uint32_t height);
 static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
@@ -530,11 +529,15 @@ void dump_tmem_and_exit(char* Name);
 void col_decode16(uint16_t* addr, COLOR* col);
 void show_combiner_equation(void);
 void show_blender_equation(void);
+#if 0
 void showtile(uint32_t tilenum, int stop, int clamped);
+#endif
 void show_tri_command(void);
 uint32_t compare_tri_command(uint32_t w0, uint32_t w1, uint32_t w2);
 void show_color(COLOR* col);
+#if 0
 void show_current_cfb(int isviorigin);
+#endif
 int getdebugcolor(void);
 void bytefill_tmem(char byte);
 
@@ -544,17 +547,22 @@ static int32_t lod_frac = 0;
 uint32_t DebugMode = 0, DebugMode2 = 0;
 int debugcolor = 0;
 uint8_t hidden_bits[0x400000];
-struct {uint32_t shift; uint32_t add;} z_dec_table[8] = {
-     6, 0x00000,
-     5, 0x20000,
-     4, 0x30000,
-     3, 0x38000,
-     2, 0x3c000,
-     1, 0x3e000,
-     0, 0x3f000,
-     0, 0x3f800,
+
+struct z_dec {
+  uint32_t shift;
+  uint32_t add;
 };
 
+struct z_dec z_dec_table[8] = {
+  {6, 0x00000},
+  {5, 0x20000},
+  {4, 0x30000},
+  {3, 0x38000},
+  {2, 0x3C000},
+  {1, 0x3E000},
+  {0, 0x3F000},
+  {0, 0x3F800},
+};
 
 static void (*vi_fetch_filter_func[2])(CCVG*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = 
 {
@@ -606,15 +614,15 @@ static void (*render_spans_2cycle_func[4])(int, int, int, int) =
   render_spans_2cycle_notex, render_spans_2cycle_notexel1, render_spans_2cycle_notexelnext, render_spans_2cycle_complete
 };
 
-void (*fbread1_ptr)(uint32_t) = fbread_func[0];
-void (*fbread2_ptr)(uint32_t) = fbread2_func[0];
-void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t) = fbwrite_func[0];
-void (*fbfill_ptr)(uint32_t) = fbfill_func[0];
-void (*get_dither_noise_ptr)(int, int, int*, int*) = get_dither_noise_func[0];
-void (*rgb_dither_ptr)(int*, int*, int*, int) = rgb_dither_func[0];
-void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*) = tcdiv_func[0];
-void (*render_spans_1cycle_ptr)(int, int, int, int) = render_spans_1cycle_func[2];
-void (*render_spans_2cycle_ptr)(int, int, int, int) = render_spans_2cycle_func[1];
+void (*fbread1_ptr)(uint32_t) = fbread_4;
+void (*fbread2_ptr)(uint32_t) = fbread2_4;
+void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t) = fbwrite_4;
+void (*fbfill_ptr)(uint32_t) = fbfill_4;
+void (*get_dither_noise_ptr)(int, int, int*, int*) = get_dither_noise_complete;
+void (*rgb_dither_ptr)(int*, int*, int*, int) = rgb_dither_complete;
+void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*) = tcdiv_nopersp;
+void (*render_spans_1cycle_ptr)(int, int, int, int) = render_spans_1cycle_complete;
+void (*render_spans_2cycle_ptr)(int, int, int, int) = render_spans_2cycle_notexel1;
 
 typedef struct{
   uint8_t cvg;
@@ -640,17 +648,13 @@ int32_t clamp_t_diff[8];
 int32_t clamp_s_diff[8];
 CVtcmaskDERIVATIVE cvarray[0x100];
 
-
-
 #define RREADADDR8(in) (((in) <= plim) ? (_rdram_8[(in) ^ BYTE_ADDR_XOR]) : 0)
 #define RREADIDX16(in) (((in) <= idxlim16) ? (_rdram_16[(in) ^ WORD_ADDR_XOR]) : 0)
 #define RREADIDX32(in) (((in) <= idxlim32) ? (rdram[(in)]) : 0)
 
-
 #define RWRITEADDR8(in, val)  {if ((in) <= plim) _rdram_8[(in) ^ BYTE_ADDR_XOR] = (val);}
 #define RWRITEIDX16(in, val)  {if ((in) <= idxlim16) _rdram_16[(in) ^ WORD_ADDR_XOR] = (val);}
 #define RWRITEIDX32(in, val)  {if ((in) <= idxlim32) rdram[(in)] = (val);}
-
 
 #define HREADADDR8(in)      (((in) <= 0x3fffff) ? (hidden_bits[(in) ^ BYTE_ADDR_XOR]) : 0)
 #define HWRITEADDR8(in, val)  {if ((in) <= 0x3fffff) hidden_bits[(in) ^ BYTE_ADDR_XOR] = (val);}
@@ -661,12 +665,14 @@ struct onetime
 } onetimewarnings;
 
 extern int32_t pitchindwords;
+#if 0
 extern HRESULT res;
 extern LPDIRECTDRAW7 lpdd;
 extern LPDIRECTDRAWSURFACE7 lpddsprimary; 
 extern LPDIRECTDRAWSURFACE7 lpddsback;
 extern DDSURFACEDESC2 ddsd;
 extern RECT src, dst;
+#endif
 
 uint32_t z64gl_command = 0;
 uint32_t command_counter = 0;
@@ -1043,12 +1049,8 @@ int rdp_init()
   return 0;
 }
 
-int rdp_update()
-{
-
-  
-  
-  
+#if 0
+int rdp_update() {
   int i, j;
   uint32_t final = 0;
 
@@ -1056,39 +1058,11 @@ int rdp_update()
   CCVG viaa_array[2048];
   CCVG divot_array[2048];
 
-  
-  
-
-  
-  
-  
-  
-
-  
-  
-  
-  
-
-  
-
-  
-  
-
-  
-
-
-  
-
   int32_t hres, vres;
   hres = (vi_h_start & 0x3ff) - ((vi_h_start >> 16) & 0x3ff);
     
   vres = (vi_v_start & 0x3ff) - ((vi_v_start >> 16) & 0x3ff);
   vres >>= 1;
-
-  
-  
-  
-
   
   int dither_filter = (vi_control >> 16) & 1;
   int fsaa = !((vi_control >> 9) & 1);
@@ -1105,11 +1079,6 @@ int rdp_update()
     stricterror("rdp_update: vbus_clock_enable bit set in VI_CONTROL_REG register. Never run this code on your N64! It's rumored that turning this bit on\
           will result in permanent damage to the hardware! Emulation will now continue.\n");
 
-  
-  
-  
-  
-
   void (*vi_fetch_filter_ptr)(CCVG*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = vi_fetch_filter_func[vitype & 1];
 
   int ispal = (vi_v_sync & 0x3ff) > 550;
@@ -1120,15 +1089,6 @@ int rdp_update()
           Results on hardware can be unpredictable.");
     onetimewarnings.ntscnolerp = 1;
   }
-
-  
-  
-  
-  
-  
-  
-  
-    
 #ifdef WIN32
   int slowbright = 0;
   if (GetAsyncKeyState(0x91))
@@ -1155,19 +1115,10 @@ int rdp_update()
   int32_t v_end = vi_v_start & 0x3ff;
   int32_t v_sync = vi_v_sync & 0x3ff;
 
-  
   int lowerfield = serration_pulses && (ispal ? v_start < oldvstart : v_start > oldvstart);
-  
-  
-  
-  
-  
-  
 
   if (serration_pulses && v_start == oldvstart)
-  {
     serration_pulses = lowerfield = 0;
-  }
 
   int linecount = serration_pulses ? (pitchindwords << 1) : pitchindwords;
   int lineshifter = serration_pulses ? 0 : 1;
@@ -1177,21 +1128,13 @@ int rdp_update()
 
   v_start = (v_start - (ispal ? 47 : 37)) >> 1;
   
-  
-  
   if (v_start < 0)
     v_start = 0;
 
   if ((hres + h_start) > PRESCALE_WIDTH)
-  {
     hres = PRESCALE_WIDTH - h_start;
-  }
 
-  
-  
-
-  if ((vres + v_start) > PRESCALE_HEIGHT)
-  {
+  if ((vres + v_start) > PRESCALE_HEIGHT) {
     vres = PRESCALE_HEIGHT - v_start;
     stricterror("vres = %d v_start = %d v_video_start = %d", vres, v_start, (vi_v_start >> 16) & 0x3ff);
   }
@@ -1221,7 +1164,6 @@ int rdp_update()
   int cache_marker = 0, cache_next_marker = 0, divot_cache_marker = 0, divot_cache_next_marker = 0;
   int prev_scan_x = 0, scan_x = 0, next_scan_x = 0, far_scan_x = 0;
   int prev_x = 0, cur_x = 0, next_x = 0, far_x = 0;
-
   
   uint32_t pix = 0;
   uint8_t cur_cvg = 0;
@@ -1238,105 +1180,91 @@ int rdp_update()
 
   uint32_t prescale_ptr = v_start * linecount + h_start + (lowerfield ? pitchindwords : 0);
   
-
   if (hres <= 0 || vres <= 0 || (!(vitype & 2) && prevwasblank))
-  {
     return 0;
-  }
-  
-  
-  
-  
 
-  
-  
+#if 0 
   res = IDirectDrawSurface_Lock(lpddsback, 0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_NOSYSLOCK, 0);
-  if (res == DDERR_SURFACELOST)
-  {
-    while(1){
-    res = IDirectDrawSurface_Restore(lpddsback);
-    if (res != DD_OK)
-      fatalerror("Restore failed with DirectDraw error %x", res);
-    res = IDirectDrawSurface_Lock(lpddsback, 0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_NOSYSLOCK, 0);
-    if (res != DDERR_SURFACELOST)
-      break;
-    };
+
+  if (res == DDERR_SURFACELOST) {
+    while(1) {
+      res = IDirectDrawSurface_Restore(lpddsback);
+      if (res != DD_OK)
+        fatalerror("Restore failed with DirectDraw error %x", res);
+      res = IDirectDrawSurface_Lock(lpddsback, 0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_NOSYSLOCK, 0);
+      if (res != DDERR_SURFACELOST)
+        break;
+    }
   }
+
   else if (res != DD_OK)
     fatalerror("Lock failed with DirectDraw error %x", res);
 
+  /* TYLER: Assign graphics ptr here? */
   PreScale = (int32_t*)ddsd.lpSurface;
-
+#endif
   
-  
-  
-  
-  
-  if (!(vitype & 2))
-  {
+  if (!(vitype & 2)) {
     memset(tvfadeoutstate, 0, PRESCALE_HEIGHT * sizeof(uint32_t));
+
     for (i = 0; i < PRESCALE_HEIGHT; i++)
       memset(&PreScale[i * pitchindwords], 0, PRESCALE_WIDTH * sizeof(int32_t)); 
+
     prevwasblank = 1;
   }
-  else
-  {
+
+  else {
     prevwasblank = 0;
     
-    
     if (h_start > 0 && h_start < PRESCALE_WIDTH)
-    {
       for (i = 0; i < vactivelines; i++)
         memset(&PreScale[i * pitchindwords], 0, h_start * sizeof(uint32_t));
-    }
+
     if (h_end >= 0 && h_end < PRESCALE_WIDTH)
-    {
       for (i = 0; i < vactivelines; i++)
         memset(&PreScale[i * pitchindwords + h_end], 0, hrightblank * sizeof(uint32_t));
-    }
+
     for (i = 0; i < ((v_start << twolines) + (lowerfield ? 1 : 0)); i++)
     {
       if (tvfadeoutstate[i])
         tvfadeoutstate[i]--;
+
       if (!tvfadeoutstate[i] && validh)
         memset(&PreScale[i * pitchindwords + h_start], 0, hres * sizeof(uint32_t));
     }
-    if (!serration_pulses)
-    {
-      for(j = 0; j < vres; j++)
-      {
+
+    if (!serration_pulses) {
+      for(j = 0; j < vres; j++, i++)
         tvfadeoutstate[i] = 2;
-        i++;
-      }
     }
+
     else
     {
-      for(j = 0; j < vres; j++)
-      {
+      for(j = 0; j < vres; j++, i += 2) {
         tvfadeoutstate[i] = 2;
+
         if (tvfadeoutstate[i + 1])
           tvfadeoutstate[i + 1]--;
+
         if (!tvfadeoutstate[i + 1] && validh)
           memset(&PreScale[(i + 1) * pitchindwords + h_start], 0, hres * sizeof(uint32_t));
-        i += 2;
       }
     }
-    for (; i < vactivelines; i++)
-    {
+
+    for (; i < vactivelines; i++) {
       if (tvfadeoutstate[i])
         tvfadeoutstate[i]--;
+
       if (!tvfadeoutstate[i] && validh)
         memset(&PreScale[i * pitchindwords + h_start], 0, hres * sizeof(uint32_t));
     }
-   }
+  }
 
   switch (vitype)
   {
     case 0:    
     case 1:
-    {
       break;
-    }
 
     case 2:    
     case 3:    
@@ -1576,44 +1504,42 @@ int rdp_update()
         default:    stricterror("Unknown framebuffer format %d\n", vi_control & 0x3);
   }
 
+#if 0
   res = IDirectDrawSurface_Unlock(lpddsback, 0);
+
   if (res != DD_OK && res != DDERR_GENERIC && res != DDERR_SURFACELOST)
     fatalerror("Couldn't unlock the offscreen surface with DirectDraw error %x", res);
-  
-  
-
-  
-  
+#endif
 
   int visiblelines = (ispal ? 576 : 480) >> lineshifter;
-
   src.bottom = visiblelines;
 
-  if (dst.left < dst.right && dst.top < dst.bottom)
-  {
+#if 0
+  if (dst.left < dst.right && dst.top < dst.bottom) {
     res = IDirectDrawSurface_Blt(lpddsprimary, &dst, lpddsback, &src, DDBLT_WAIT, 0);
-    if (res == DDERR_SURFACELOST)
-    {
+
+    if (res == DDERR_SURFACELOST) {
       while(1){
       res = IDirectDraw4_RestoreAllSurfaces(lpdd);
+
       if (res != DD_OK)
         fatalerror("RestoreAllSurfaces failed with DirectDraw error %x", res);
+
       res = IDirectDrawSurface_Blt(lpddsprimary, &dst, lpddsback, &src, DDBLT_WAIT, 0);    
+
       if (res != DDERR_SURFACELOST)
         break;
       }
     }
+
     else if (res != DD_OK && res != DDERR_GENERIC)
       fatalerror("Scaled blit failed with DirectDraw error %x", res);
-    
   }
-
-  
-
+#endif
   
   return 0;
 }
-
+#endif
 
 static void vi_fetch_filter16(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint32_t fsaa, uint32_t dither_filter, uint32_t vres)
 {
@@ -1629,7 +1555,7 @@ static void vi_fetch_filter16(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint
   g = GET_MED(pix);
   b = GET_LOW(pix);
 
-  uint32_t fbw = vi_width & 0xfff;
+  uint32_t fbw = *vi_width & 0xfff;
 
   if (cur_cvg == 7)
   {
@@ -1661,7 +1587,7 @@ static void vi_fetch_filter32(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint
   g = (pix >> 16) & 0xff;
   b = (pix >> 8) & 0xff;
 
-  uint32_t fbw = vi_width & 0xfff;
+  uint32_t fbw = *vi_width & 0xfff;
   
   if (cur_cvg == 7)
   {
@@ -5820,9 +5746,6 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
     fbendptr = fb_address + PIXELS_TO_BYTES_SPECIAL4((fb_width * i + xstart), fb_size);
     length = flip ? (xstart - xendsc) : (xendsc - xstart);
 
-    
-    
-
     for (j = 0; j <= length; j += fbadvance)
     {
       ss = s >> 16;
@@ -6767,7 +6690,7 @@ static void edgewalker_for_loads(int32_t* lewdata)
 
 static uint32_t READ_RDP_DATA(uint32_t address)
 {
-  if (dp_status & DP_STATUS_XBUS_DMA)    
+  if (my_rdp->regs[DPC_STATUS_REG] & DP_STATUS_XBUS_DMA)    
   {
     return rsp_dmem[(address & 0xfff) >> 2];
   }
@@ -7136,10 +7059,10 @@ static int rdp_dasm(char *buffer)
       }
       cmd[2] = rdp_cmd_data[rdp_cmd_cur+2];
       cmd[3] = rdp_cmd_data[rdp_cmd_cur+3];
-      sprintf(s,    "%4.4f", (float)(INT16)((cmd[2] >> 16) & 0xffff) / 32.0f);
-      sprintf(t,    "%4.4f", (float)(INT16)((cmd[2] >>  0) & 0xffff) / 32.0f);
-      sprintf(dsdx, "%4.4f", (float)(INT16)((cmd[3] >> 16) & 0xffff) / 1024.0f);
-      sprintf(dtdy, "%4.4f", (float)(INT16)((cmd[3] >> 16) & 0xffff) / 1024.0f);
+      sprintf(s,    "%4.4f", (float)(int16_t)((cmd[2] >> 16) & 0xffff) / 32.0f);
+      sprintf(t,    "%4.4f", (float)(int16_t)((cmd[2] >>  0) & 0xffff) / 32.0f);
+      sprintf(dsdx, "%4.4f", (float)(int16_t)((cmd[3] >> 16) & 0xffff) / 1024.0f);
+      sprintf(dtdy, "%4.4f", (float)(int16_t)((cmd[3] >> 16) & 0xffff) / 1024.0f);
 
       if (command == 0x24)
           sprintf(buffer, "Texture_Rectangle      %d, %s, %s, %s, %s,  %s, %s, %s, %s", tile, sh, th, sl, tl, s, t, dsdx, dtdy);
@@ -7398,26 +7321,13 @@ static void rdp_sync_tile(uint32_t w1, uint32_t w2)
 
 static void rdp_sync_full(uint32_t w1, uint32_t w2)
 {
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-
   z64gl_command = 0;
+  BusRaiseRCPInterrupt(my_rdp->bus, MI_INTR_DP);
 
+#if 0
   *gfx.MI_INTR_REG |= DP_INTERRUPT;
   gfx.CheckInterrupts();
+#endif
 }
 
 static void rdp_set_key_gb(uint32_t w1, uint32_t w2)
@@ -7875,92 +7785,52 @@ static void (*const rdp_command_table[64])(uint32_t w1, uint32_t w2) =
   rdp_set_combine,  rdp_set_texture_image,  rdp_set_mask_image,    rdp_set_color_image
 };
 
-void rdp_process_list(void)
+void RDPProcessList(struct RDP *rdp)
 {
   int i, length;
   uint32_t cmd, cmd_length;
+  my_rdp = rdp;
 
-  dp_status &= ~DP_STATUS_FREEZE;
-  
-  
-  
-  
+  return;
 
-  
+  debug("RDPProcessList();");
 
-  if (dp_end <= dp_current)
-  {
-    
-    
-    
-    
-    
-    
+  rdp->regs[DPC_STATUS_REG] &= ~DP_STATUS_FREEZE;
+  if (rdp->regs[DPC_END_REG] <= rdp->regs[DPC_CURRENT_REG])
     return;
-  }
 
-  length = dp_end - dp_current;
-
+  length = rdp->regs[DPC_END_REG] - rdp->regs[DPC_CURRENT_REG];
   ptr_onstart = rdp_cmd_ptr;
   
-  
-  
-
-  
-  
-  if (dp_current & 7)
-  {
+  if (rdp->regs[DPC_CURRENT_REG] & 7) {
     rdp_pipeline_crashed = 1;
     if (!onetimewarnings.dpcurunaligned)
       stricterror("dp_current is not 64bit-aligned. The RDP has crashed.");
     onetimewarnings.dpcurunaligned = 1;
-    dp_status |= (DP_STATUS_DMA_BUSY | DP_STATUS_CMD_BUSY);
-    
-    
-    
+    rdp->regs[DPC_STATUS_REG] |= (DP_STATUS_DMA_BUSY | DP_STATUS_CMD_BUSY);
     return;
   }
-
   
   if ((rdp_cmd_ptr + (length >> 2)) & ~0xffff)
     fatalerror("rdp_process_list: rdp_cmd_ptr overflow: length 0x%x ptr_onstart 0x%x", length, ptr_onstart);
 
-
-  
-  for (i = 0; i < length; i += 4)
-  {
-    rdp_cmd_data[rdp_cmd_ptr++] = READ_RDP_DATA(dp_current + i);
-    
-    
-  }
-
-
+  for (i = 0; i < length; i += 4) 
+    rdp_cmd_data[rdp_cmd_ptr++] = READ_RDP_DATA(rdp->regs[DPC_CURRENT_REG] + i);
   
   cmd = (rdp_cmd_data[0] >> 24) & 0x3f;
   cmd_length = rdp_cmd_ptr << 2;
 
-  
-  if (cmd_length < rdp_command_length[cmd])
-  {
-    
-    
-    
-    dp_start = dp_current = dp_end;
-    
-    
+  if (cmd_length < rdp_command_length[cmd]) {
+    rdp->regs[DPC_START_REG] = rdp->regs[DPC_CURRENT_REG] = rdp->regs[DPC_END_REG];
     return;
   }
 
-  while (rdp_cmd_cur < rdp_cmd_ptr && !rdp_pipeline_crashed)
-  {
+  while (rdp_cmd_cur < rdp_cmd_ptr && !rdp_pipeline_crashed) {
     cmd = (rdp_cmd_data[rdp_cmd_cur] >> 24) & 0x3f;
     cmd_length = rdp_command_length[cmd] >> 2;
-
     
-    if ((rdp_cmd_ptr - rdp_cmd_cur) < cmd_length)
-    {
-      
-      dp_start = dp_current = dp_end;
+    if ((rdp_cmd_ptr - rdp_cmd_cur) < cmd_length) {
+      rdp->regs[DPC_START_REG] = rdp->regs[DPC_CURRENT_REG] = rdp->regs[DPC_END_REG];
       return;
     }
     
@@ -7977,11 +7847,6 @@ void rdp_process_list(void)
       }
       command_counter++;
     }
-
-    
-    
-    
-
     
     rdp_command_table[cmd](rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur+1]);
     
@@ -7989,10 +7854,7 @@ void rdp_process_list(void)
   };
   rdp_cmd_ptr = 0;
   rdp_cmd_cur = 0;
-  dp_start = dp_current = dp_end;
-  
-  
-  
+  rdp->regs[DPC_START_REG] = rdp->regs[DPC_CURRENT_REG] = rdp->regs[DPC_END_REG];
 }
 
 static int alpha_compare(int32_t comb_alpha)
@@ -8273,7 +8135,7 @@ static void fbwrite_16(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b)
   fb = hb = (fb_address >> 1) + curpixel;  
 
   int32_t finalcvg = finalize_spanalpha();
-  INT16 finalcolor; 
+  int16_t finalcolor; 
 
   if (fb_format == FORMAT_RGBA)
   {
@@ -9673,6 +9535,7 @@ uint32_t vi_integer_sqrt(uint32_t a)
     return res;
 }
 
+#if 0
 static void clearscreen(uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint32_t white)
 {
   DDBLTFX ddbltfx; 
@@ -9688,6 +9551,7 @@ static void clearscreen(uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint
   if (res != DD_OK)
     fatalerror("clearscreen: Blt failed.");
 }
+#endif
 
 static void clearfb16(uint16_t* fb, uint32_t width,uint32_t height)
 {
@@ -10670,7 +10534,7 @@ if (other_modes.cycle_type == CYCLE_TYPE_2)
   bRGBText[other_modes.blend_m2a_1],bAText[1][other_modes.blend_m2b_1]);
 }
 
-
+#if 0
 void showtile(uint32_t tilenum, int stop, int clamped)
 {
   if (tilenum > 7)
@@ -10713,7 +10577,9 @@ void showtile(uint32_t tilenum, int stop, int clamped)
   if (nominalwidth > 619)
     fatalerror("showtile: too large");
 
+#if 0
   clearscreen(492,0,620,479,1);
+#endif
 
   uint32_t y = 0;
   int32_t* d = 0;
@@ -10961,6 +10827,7 @@ endi8:
   }
   }
 }
+#endif
 
 void show_tri_command(void)
 {
@@ -10980,6 +10847,7 @@ void show_color(COLOR* col)
   stricterror("R: 0x%x, G: 0x%x, B: 0x%x, A: 0x%x", col->r, col->g, col->b, col->a);
 }
 
+#if 0
 void show_current_cfb(int isviorigin)
 {
   int i, j;
@@ -11120,8 +10988,8 @@ void show_current_cfb(int isviorigin)
   res = IDirectDrawSurface_Blt(lpddsprimary, &smallrect, lpddsback, &srcrect, DDBLT_WAIT, 0);
   if (res != DD_OK)
     fatalerror("show_current_cfb: Blt failed");
-
 }
+#endif
 
 int getdebugcolor(void)
 {

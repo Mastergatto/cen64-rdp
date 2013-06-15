@@ -10,8 +10,8 @@
  * ========================================================================= */
 #include "Address.h"
 #include "Common.h"
+#include "Core.h"
 #include "CPU.h"
-#include "DisplayList.h"
 #include "Interface.h"
 #include "Registers.h"
 

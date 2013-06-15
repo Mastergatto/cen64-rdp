@@ -36,7 +36,11 @@ AR = ar
 DOXYGEN = doxygen
 
 WARNINGS = -Wall -Wextra -pedantic
-RDP_FLAGS =
+
+# Remove these flags when Core.c is cleaned up...
+RDP_FLAGS = -Wno-unused-parameter -Wno-unused-variable \
+  -Wno-sign-compare -Wno-unused-but-set-variable -Wno-unused-function \
+  -Wno-maybe-uninitialized
 
 COMMON_CFLAGS = $(WARNINGS) $(RDP_FLAGS) -std=c99 -march=native -I.
 COMMON_CXXFLAGS = $(WARNINGS) $(RDP_FLAGS) -std=c++0x -march=native -I.
