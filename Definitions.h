@@ -15,5 +15,18 @@
 /* MI_INTR_REG bits. */
 #define MI_INTR_DP                0x20
 
+/* DPC_STATUS_REG read bits. */
+#define DP_XBUS_DMEM_DMA          0x00000001
+#define DP_FREEZE                 0x00000002
+#define DP_FLUSH                  0x00000004
+
+/* DPC_STATUS_REG write bits. */
+#define DP_CLEAR_XBUS_DMEM_DMA    0x00000001
+#define DP_SET_XBUS_DMEM_DMA      0x00000002
+#define DP_CLEAR_FREEZE           0x00000004
+#define DP_SET_FREEZE             0x00000008
+#define DP_CLEAR_FLUSH            0x00000010
+#define DP_SET_FLUSH              0x00000020
+
 #endif
 

@@ -12,6 +12,7 @@
 #include "Common.h"
 #include "Core.h"
 #include "CPU.h"
+#include "Definitions.h"
 #include "Interface.h"
 #include "Registers.h"
 
@@ -44,13 +45,39 @@ DPRegWrite(void *_rdp, uint32_t address, void *_data) {
   enum DPRegister reg = (enum DPRegister) (address / 4);
 
   debugarg("DPRegWrite: Writing to register [%s].", DPRegisterMnemonics[reg]);
-  rdp->regs[reg] = *data;
 
-  if (reg == DPC_START_REG)
-    rdp->regs[DPC_CURRENT_REG] = *data;
+  switch(reg) {
+    case DPC_START_REG:
+      rdp->regs[DPC_CURRENT_REG] = *data;
+      rdp->regs[DPC_START_REG] = *data;
+      break;
 
-  else if (reg == DPC_END_REG)
-    RDPProcessList(rdp);
+    case DPC_END_REG:
+      rdp->regs[DPC_END_REG] = *data;
+      RDPProcessList(rdp);
+      break;
+
+    case DPC_STATUS_REG:
+      if (*data & DP_CLEAR_XBUS_DMEM_DMA)
+        rdp->regs[DPC_STATUS_REG] &= ~DP_XBUS_DMEM_DMA;
+      else if (*data & DP_SET_XBUS_DMEM_DMA)
+        rdp->regs[DPC_STATUS_REG] |= DP_XBUS_DMEM_DMA;
+
+      if (*data & DP_CLEAR_FREEZE)
+        rdp->regs[DPC_STATUS_REG] &= ~DP_FREEZE;
+      else if (*data & DP_SET_FREEZE)
+        rdp->regs[DPC_STATUS_REG] |= DP_FREEZE;
+
+      if (*data & DP_CLEAR_FLUSH)
+        rdp->regs[DPC_STATUS_REG] &= ~DP_FLUSH;
+      else if (*data & DP_SET_FLUSH)
+        rdp->regs[DPC_STATUS_REG] |= DP_FLUSH;
+
+      break;
+
+    default:
+      rdp->regs[reg] = *data;
+  }
 
   return 0;
 }
