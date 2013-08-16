@@ -84,8 +84,8 @@ uint16_t* _rdram_16;
 uint32_t brightness = 0;
 int32_t iseed = 1;
 
-static uint8_t* rdram;
-static uint8_t* rsp_dmem;
+static uint32_t* rdram;
+static uint32_t* rsp_dmem;
 
 /* TYLER: Temporary hack. */
 static struct RDP *my_rdp;
@@ -96,10 +96,13 @@ void RDPSetVIWidthPointer(uint32_t *vi_width_ptr) {
 }
 
 void RDPSetRDRAMPointer(uint8_t *rdram_ptr) {
-  rdram = rdram_ptr;
+  rdram = (uint32_t *) rdram_ptr;
+  _rdram_8 = (uint8_t*)rdram;
+  _rdram_16 = (uint16_t*)rdram;
 }
+
 void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
-  rsp_dmem = rsp_dmem_ptr;
+  rsp_dmem = (uint32_t *) rsp_dmem_ptr;
 }
 
 typedef struct
@@ -648,16 +651,31 @@ int32_t clamp_t_diff[8];
 int32_t clamp_s_diff[8];
 CVtcmaskDERIVATIVE cvarray[0x100];
 
+static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF); }
+static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
+#if 0
 #define RREADADDR8(in) (((in) <= plim) ? (_rdram_8[(in) ^ BYTE_ADDR_XOR]) : 0)
 #define RREADIDX16(in) (((in) <= idxlim16) ? (_rdram_16[(in) ^ WORD_ADDR_XOR]) : 0)
 #define RREADIDX32(in) (((in) <= idxlim32) ? (rdram[(in)]) : 0)
 
 #define RWRITEADDR8(in, val)  {if ((in) <= plim) _rdram_8[(in) ^ BYTE_ADDR_XOR] = (val);}
 #define RWRITEIDX16(in, val)  {if ((in) <= idxlim16) _rdram_16[(in) ^ WORD_ADDR_XOR] = (val);}
-#define RWRITEIDX32(in, val)  {if ((in) <= idxlim32) rdram[(in)] = (val);}
+#define RWRITEIDX32(in, val)  {if ((in) <= idxlim32) rdram[(in)] = val;}
 
 #define HREADADDR8(in)      (((in) <= 0x3fffff) ? (hidden_bits[(in) ^ BYTE_ADDR_XOR]) : 0)
 #define HWRITEADDR8(in, val)  {if ((in) <= 0x3fffff) hidden_bits[(in) ^ BYTE_ADDR_XOR] = (val);}
+#else
+#define RREADADDR8(in) (((in) <= plim) ? (_rdram_8[(in)]) : 0)
+#define RREADIDX16(in) (((in) <= idxlim16) ? bswap16(_rdram_16[(in)]) : 0)
+#define RREADIDX32(in) (((in) <= idxlim32) ? bswap32((rdram[(in)])) : 0)
+
+#define RWRITEADDR8(in, val)  {if ((in) <= plim) _rdram_8[(in)] = (val);}
+#define RWRITEIDX16(in, val)  {if ((in) <= idxlim16) _rdram_16[(in)] = bswap16(val);}
+#define RWRITEIDX32(in, val)  {if ((in) <= idxlim32) rdram[(in)] = bswap32(val);}
+
+#define HREADADDR8(in)      (((in) <= 0x3fffff) ? (hidden_bits[(in) ^ BYTE_ADDR_XOR]) : 0)
+#define HWRITEADDR8(in, val)  {if ((in) <= 0x3fffff) hidden_bits[(in) ^ BYTE_ADDR_XOR] = (val);}
+#endif
 
 struct onetime
 {
@@ -985,7 +1003,7 @@ static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t ma
 int rdp_init()
 {
   if (LOG_RDP_EXECUTION)
-    rdp_exec = fopen("rdp_execute.txt", "wt");
+    rdp_exec = fopen("rdp_execute.txt", "w");
 
   combiner_rgbsub_a_r[0] = combiner_rgbsub_a_r[1] = &one_color.r;
   combiner_rgbsub_a_g[0] = combiner_rgbsub_a_g[1] = &one_color.g;
@@ -1043,7 +1061,6 @@ int rdp_init()
   idxlim32 = 0xfffff;
 #endif
 
-  
   _rdram_8 = (uint8_t*)rdram;
   _rdram_16 = (uint16_t*)rdram;
   return 0;
@@ -6692,7 +6709,7 @@ static uint32_t READ_RDP_DATA(uint32_t address)
 {
   if (my_rdp->regs[DPC_STATUS_REG] & DP_STATUS_XBUS_DMA)    
   {
-    return rsp_dmem[(address & 0xfff) >> 2];
+    return __builtin_bswap32(rsp_dmem[(address & 0xfff) >> 2]);
   }
   else
   {
@@ -7791,17 +7808,13 @@ void RDPProcessList(struct RDP *rdp)
   uint32_t cmd, cmd_length;
   my_rdp = rdp;
 
-  return;
-
-  debug("RDPProcessList();");
-
   rdp->regs[DPC_STATUS_REG] &= ~DP_STATUS_FREEZE;
   if (rdp->regs[DPC_END_REG] <= rdp->regs[DPC_CURRENT_REG])
     return;
 
   length = rdp->regs[DPC_END_REG] - rdp->regs[DPC_CURRENT_REG];
   ptr_onstart = rdp_cmd_ptr;
-  
+
   if (rdp->regs[DPC_CURRENT_REG] & 7) {
     rdp_pipeline_crashed = 1;
     if (!onetimewarnings.dpcurunaligned)
@@ -7844,10 +7857,11 @@ void RDPProcessList(struct RDP *rdp)
       
       rdp_dasm(string);
       fprintf(rdp_exec, "%08X: %08X %08X   %s\n", command_counter, rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur+1], string);
+      fflush(rdp_exec);
       }
       command_counter++;
     }
-    
+
     rdp_command_table[cmd](rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur+1]);
     
     rdp_cmd_cur += cmd_length;

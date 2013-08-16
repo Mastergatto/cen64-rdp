@@ -65,6 +65,7 @@
 
 struct RDP;
 void RDPProcessList(struct RDP *);
+int rdp_init();
 
 #endif
 
