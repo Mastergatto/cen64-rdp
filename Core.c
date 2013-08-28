@@ -1,7 +1,7 @@
 /* ============================================================================
  *  Core.c: Core RDP logic.
  *
- *  Original author: `angrylion`. Many thanks to: Ville Linde, `MooglyGuy`,
+ *  Original author: `MooglyGuy`. Many thanks to: `Ville Linde`, `angrylion`,
  *  Shoutouts to: `olivieryuyu`, `marshallh`, `LaC`, `oman`, `pinchy`, `ziggy`,
  *  `FatCat` and other folks I forgot.
  *
