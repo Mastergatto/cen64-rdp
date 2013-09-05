@@ -5511,19 +5511,109 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
   }
 }
 
+enum EdgeWalkerType {
+  EW_S,
+  EW_T,
+  EW_W,
+  EW_R,
+  EW_G,
+  EW_B,
+  EW_A,
+  EW_Z,
+};
+
+enum EdgeWalkerDeType {
+  EWDE_DSDE,
+  EWDE_DTDE,
+  EWDE_DWDE,
+  EWDE_DRDE,
+  EWDE_DGDE,
+  EWDE_DBDE,
+  EWDE_DADE,
+  EWDE_DZDE,
+};
+
+enum EdgeWalkerDehType {
+  EWDEH_DSDEH,
+  EWDEH_DTDEH,
+  EWDEH_DWDEH,
+  EWDEH_DRDEH,
+  EWDEH_DGDEH,
+  EWDEH_DBDEH,
+  EWDEH_DADEH,
+  EWDEH_DZDEH,
+};
+
+enum EdgeWalkerDiffType {
+  EWDIFF_DSDIFF,
+  EWDIFF_DTDIFF,
+  EWDIFF_DWDIFF,
+  EWDIFF_DRDIFF,
+  EWDIFF_DGDIFF,
+  EWDIFF_DBDIFF,
+  EWDIFF_DADIFF,
+  EWDIFF_DZDIFF,
+};
+
+enum EdgeWalkerDxType {
+  EWDX_DSDX,
+  EWDX_DTDX,
+  EWDX_DWDX,
+  EWDX_DRDX,
+  EWDX_DGDX,
+  EWDX_DBDX,
+  EWDX_DADX,
+  EWDX_DZDX,
+};
+
+enum EdgeWalkerDxhType {
+  EWDXH_DSDXH,
+  EWDXH_DTDXH,
+  EWDXH_DWDXH,
+  EWDXH_DRDXH,
+  EWDXH_DGDXH,
+  EWDXH_DBDXH,
+  EWDXH_DADXH,
+  EWDXH_DZDXH,
+};
+
+enum EdgeWalkerDyType {
+  EWDY_DSDY,
+  EWDY_DTDY,
+  EWDY_DWDY,
+  EWDY_DRDY,
+  EWDY_DGDY,
+  EWDY_DBDY,
+  EWDY_DADY,
+  EWDY_DZDY,
+};
+
+enum EdgeWalkerDyhType {
+  EWDYH_DSDYH,
+  EWDYH_DTDYH,
+  EWDYH_DWDYH,
+  EWDYH_DRDYH,
+  EWDYH_DGDYH,
+  EWDYH_DBDYH,
+  EWDYH_DADYH,
+  EWDYH_DZDYH,
+};
+
 static void edgewalker_for_prims(int32_t* ewdata)
 {
   int j = 0;
   int xleft = 0, xright = 0, xleft_inc = 0, xright_inc = 0;
   int r = 0, g = 0, b = 0, a = 0, z = 0, s = 0, t = 0, w = 0;
   int dr = 0, dg = 0, db = 0, da = 0;
-  int drdx = 0, dgdx = 0, dbdx = 0, dadx = 0, dzdx = 0, dsdx = 0, dtdx = 0, dwdx = 0;
-  int drdy = 0, dgdy = 0, dbdy = 0, dady = 0, dzdy = 0, dsdy = 0, dtdy = 0, dwdy = 0;
-  int drde = 0, dgde = 0, dbde = 0, dade = 0, dzde = 0, dsde = 0, dtde = 0, dwde = 0;
   int tilenum = 0, flip = 0;
   int32_t yl = 0, ym = 0, yh = 0;
   int32_t xl = 0, xm = 0, xh = 0;
   int32_t dxldy = 0, dxhdy = 0, dxmdy = 0;
+
+  int32_t ewvars[8];
+  int32_t ewdxvars[8];
+  int32_t ewdyvars[8];
+  int32_t ewdevars[8];
 
   if (other_modes.f.stalederivs)
   {
@@ -5531,11 +5621,9 @@ static void edgewalker_for_prims(int32_t* ewdata)
     other_modes.f.stalederivs = 0;
   }
 
-  
   flip = (ewdata[0] & 0x800000) ? 1 : 0;
   max_level = (ewdata[0] >> 19) & 7;
   tilenum = (ewdata[0] >> 16) & 7;
-
   
   yl = SIGN(ewdata[0], 14); 
   ym = ewdata[1] >> 16;
@@ -5550,65 +5638,51 @@ static void edgewalker_for_prims(int32_t* ewdata)
   dxhdy = (int32_t)ewdata[5];
   dxmdy = (int32_t)ewdata[7];
 
-  
-  r    = (ewdata[8] & 0xffff0000) | ((ewdata[12] >> 16) & 0x0000ffff);
-  g    = ((ewdata[8] << 16) & 0xffff0000) | (ewdata[12] & 0x0000ffff);
-  b    = (ewdata[9] & 0xffff0000) | ((ewdata[13] >> 16) & 0x0000ffff);
-  a    = ((ewdata[9] << 16) & 0xffff0000) | (ewdata[13] & 0x0000ffff);
-  drdx = (ewdata[10] & 0xffff0000) | ((ewdata[14] >> 16) & 0x0000ffff);
-  dgdx = ((ewdata[10] << 16) & 0xffff0000) | (ewdata[14] & 0x0000ffff);
-  dbdx = (ewdata[11] & 0xffff0000) | ((ewdata[15] >> 16) & 0x0000ffff);
-  dadx = ((ewdata[11] << 16) & 0xffff0000) | (ewdata[15] & 0x0000ffff);
-  drde = (ewdata[16] & 0xffff0000) | ((ewdata[20] >> 16) & 0x0000ffff);
-  dgde = ((ewdata[16] << 16) & 0xffff0000) | (ewdata[20] & 0x0000ffff);
-  dbde = (ewdata[17] & 0xffff0000) | ((ewdata[21] >> 16) & 0x0000ffff);
-  dade = ((ewdata[17] << 16) & 0xffff0000) | (ewdata[21] & 0x0000ffff);
-  drdy = (ewdata[18] & 0xffff0000) | ((ewdata[22] >> 16) & 0x0000ffff);
-  dgdy = ((ewdata[18] << 16) & 0xffff0000) | (ewdata[22] & 0x0000ffff);
-  dbdy = (ewdata[19] & 0xffff0000) | ((ewdata[23] >> 16) & 0x0000ffff);
-  dady = ((ewdata[19] << 16) & 0xffff0000) | (ewdata[23] & 0x0000ffff);
+  ewvars[EW_R]        = (ewdata[8] & 0xffff0000) | ((ewdata[12] >> 16) & 0x0000ffff);
+  ewvars[EW_G]        = ((ewdata[8] << 16) & 0xffff0000) | (ewdata[12] & 0x0000ffff);
+  ewvars[EW_B]        = (ewdata[9] & 0xffff0000) | ((ewdata[13] >> 16) & 0x0000ffff);
+  ewvars[EW_A]        = ((ewdata[9] << 16) & 0xffff0000) | (ewdata[13] & 0x0000ffff);
+  ewvars[EW_S]        = (ewdata[24] & 0xffff0000) | ((ewdata[28] >> 16) & 0x0000ffff);
+  ewvars[EW_T]        = ((ewdata[24] << 16) & 0xffff0000)  | (ewdata[28] & 0x0000ffff);
+  ewvars[EW_W]        = (ewdata[25] & 0xffff0000) | ((ewdata[29] >> 16) & 0x0000ffff);
+  ewvars[EW_Z]        = ewdata[40];
 
-  
-  s    = (ewdata[24] & 0xffff0000) | ((ewdata[28] >> 16) & 0x0000ffff);
-  t    = ((ewdata[24] << 16) & 0xffff0000)  | (ewdata[28] & 0x0000ffff);
-  w    = (ewdata[25] & 0xffff0000) | ((ewdata[29] >> 16) & 0x0000ffff);
-  dsdx = (ewdata[26] & 0xffff0000) | ((ewdata[30] >> 16) & 0x0000ffff);
-  dtdx = ((ewdata[26] << 16) & 0xffff0000)  | (ewdata[30] & 0x0000ffff);
-  dwdx = (ewdata[27] & 0xffff0000) | ((ewdata[31] >> 16) & 0x0000ffff);
-  dsde = (ewdata[32] & 0xffff0000) | ((ewdata[36] >> 16) & 0x0000ffff);
-  dtde = ((ewdata[32] << 16) & 0xffff0000)  | (ewdata[36] & 0x0000ffff);
-  dwde = (ewdata[33] & 0xffff0000) | ((ewdata[37] >> 16) & 0x0000ffff);
-  dsdy = (ewdata[34] & 0xffff0000) | ((ewdata[38] >> 16) & 0x0000ffff);
-  dtdy = ((ewdata[34] << 16) & 0xffff0000)  | (ewdata[38] & 0x0000ffff);
-  dwdy = (ewdata[35] & 0xffff0000) | ((ewdata[39] >> 16) & 0x0000ffff);
-  
-  
-  z    = ewdata[40];
-  dzdx = ewdata[41];
-  dzde = ewdata[42];
-  dzdy = ewdata[43];
+  ewdxvars[EWDX_DRDX] = (ewdata[10] & 0xffff0000) | ((ewdata[14] >> 16) & 0x0000ffff);
+  ewdxvars[EWDX_DGDX] = ((ewdata[10] << 16) & 0xffff0000) | (ewdata[14] & 0x0000ffff);
+  ewdxvars[EWDX_DBDX] = (ewdata[11] & 0xffff0000) | ((ewdata[15] >> 16) & 0x0000ffff);
+  ewdxvars[EWDX_DADX] = ((ewdata[11] << 16) & 0xffff0000) | (ewdata[15] & 0x0000ffff);
+  ewdxvars[EWDX_DSDX] = (ewdata[26] & 0xffff0000) | ((ewdata[30] >> 16) & 0x0000ffff);
+  ewdxvars[EWDX_DTDX] = ((ewdata[26] << 16) & 0xffff0000)  | (ewdata[30] & 0x0000ffff);
+  ewdxvars[EWDX_DWDX] = (ewdata[27] & 0xffff0000) | ((ewdata[31] >> 16) & 0x0000ffff);
+  ewdxvars[EWDX_DZDX] = ewdata[41];
 
-  
-  
-  
-  
-  
+  ewdevars[EWDE_DRDE] = (ewdata[16] & 0xffff0000) | ((ewdata[20] >> 16) & 0x0000ffff);
+  ewdevars[EWDE_DGDE] = ((ewdata[16] << 16) & 0xffff0000) | (ewdata[20] & 0x0000ffff);
+  ewdevars[EWDE_DBDE] = (ewdata[17] & 0xffff0000) | ((ewdata[21] >> 16) & 0x0000ffff);
+  ewdevars[EWDE_DADE] = ((ewdata[17] << 16) & 0xffff0000) | (ewdata[21] & 0x0000ffff);
+  ewdevars[EWDE_DSDE] = (ewdata[32] & 0xffff0000) | ((ewdata[36] >> 16) & 0x0000ffff);
+  ewdevars[EWDE_DTDE] = ((ewdata[32] << 16) & 0xffff0000)  | (ewdata[36] & 0x0000ffff);
+  ewdevars[EWDE_DWDE] = (ewdata[33] & 0xffff0000) | ((ewdata[37] >> 16) & 0x0000ffff);
+  ewdevars[EWDE_DZDE] = ewdata[42];
 
-  spans[SPAN_DS] = dsdx & ~0x1f;
-  spans[SPAN_DT] = dtdx & ~0x1f;
-  spans[SPAN_DW] = dwdx & ~0x1f;
-  spans[SPAN_DR] = drdx & ~0x1f;
-  spans[SPAN_DG] = dgdx & ~0x1f;
-  spans[SPAN_DB] = dbdx & ~0x1f;
-  spans[SPAN_DA] = dadx & ~0x1f;
-  spans[SPAN_DZ] = dzdx;
-  
-  
-  spans_drdy = drdy >> 14;
-  spans_dgdy = dgdy >> 14;
-  spans_dbdy = dbdy >> 14;
-  spans_dady = dady >> 14;
-  spans_dzdy = dzdy >> 10;
+  ewdyvars[EWDY_DRDY] = (ewdata[18] & 0xffff0000) | ((ewdata[22] >> 16) & 0x0000ffff);
+  ewdyvars[EWDY_DGDY] = ((ewdata[18] << 16) & 0xffff0000) | (ewdata[22] & 0x0000ffff);
+  ewdyvars[EWDY_DBDY] = (ewdata[19] & 0xffff0000) | ((ewdata[23] >> 16) & 0x0000ffff);
+  ewdyvars[EWDY_DADY] = ((ewdata[19] << 16) & 0xffff0000) | (ewdata[23] & 0x0000ffff);
+  ewdyvars[EWDY_DSDY] = (ewdata[34] & 0xffff0000) | ((ewdata[38] >> 16) & 0x0000ffff);
+  ewdyvars[EWDY_DTDY] = ((ewdata[34] << 16) & 0xffff0000)  | (ewdata[38] & 0x0000ffff);
+  ewdyvars[EWDY_DWDY] = (ewdata[35] & 0xffff0000) | ((ewdata[39] >> 16) & 0x0000ffff);
+  ewdyvars[EWDY_DZDY] = ewdata[43];
+
+  int32_t dzdx = ewdxvars[EWDX_DZDX];
+  ClearLow5(spans, ewdxvars);
+  spans[SPAN_DZ] = ewdxvars[EWDX_DZDX];
+
+  spans_drdy = ewdyvars[EWDY_DRDY] >> 14;
+  spans_dgdy = ewdyvars[EWDY_DGDY] >> 14;
+  spans_dbdy = ewdyvars[EWDY_DBDY] >> 14;
+  spans_dady = ewdyvars[EWDY_DADY] >> 14;
+  spans_dzdy = ewdyvars[EWDY_DZDY] >> 10;
   spans_drdy = SIGN(spans_drdy, 13);
   spans_dgdy = SIGN(spans_dgdy, 13);
   spans_dbdy = SIGN(spans_dbdy, 13);
@@ -5625,120 +5699,59 @@ static void edgewalker_for_prims(int32_t* ewdata)
   spans_cdz = spans[SPAN_DZ] >> 10;
   spans_cdz = SIGN(spans_cdz, 22);
   
-  spans_dsdy = dsdy & ~0x7fff;
-  spans_dtdy = dtdy & ~0x7fff;
-  spans_dwdy = dwdy & ~0x7fff;
-
+  spans_dsdy = ewdyvars[EWDY_DSDY] & ~0x7fff;
+  spans_dtdy = ewdyvars[EWDY_DTDY] & ~0x7fff;
+  spans_dwdy = ewdyvars[EWDY_DWDY] & ~0x7fff;
   
-  int dzdy_dz = (dzdy >> 16) & 0xffff;
-  int dzdx_dz = (dzdx >> 16) & 0xffff;
+  int dzdy_dz = (ewdyvars[EWDY_DZDY] >> 16) & 0xffff;
+  int dzdx_dz = (ewdxvars[EWDX_DZDX] >> 16) & 0xffff;
   
   spans_dzpix = ((dzdy_dz & 0x8000) ? ((~dzdy_dz) & 0x7fff) : dzdy_dz) + ((dzdx_dz & 0x8000) ? ((~dzdx_dz) & 0x7fff) : dzdx_dz);
   spans_dzpix = normalize_dzpix(spans_dzpix & 0xffff) & 0xffff;
   
-
-  
   xleft_inc = (dxmdy >> 2) & ~0x1;
   xright_inc = (dxhdy >> 2) & ~0x1;
-  
-  
   
   xright = xh & ~0x1;
   xleft = xm & ~0x1;
     
   int k = 0;
 
-  int dsdiff, dtdiff, dwdiff, drdiff, dgdiff, dbdiff, dadiff, dzdiff;
+  int32_t diffvars[8];
   int sign_dxhdy = (dxhdy & 0x80000000) ? 1 : 0;
   
-  int dsdeh, dtdeh, dwdeh, drdeh, dgdeh, dbdeh, dadeh, dzdeh, dsdyh, dtdyh, dwdyh, drdyh, dgdyh, dbdyh, dadyh, dzdyh; 
   int do_offset = !(sign_dxhdy ^ flip);
 
-  if (do_offset)
-  {
-    dsdeh = dsde & ~0x1ff;
-    dtdeh = dtde & ~0x1ff;  
-    dwdeh = dwde & ~0x1ff;  
-    drdeh = drde & ~0x1ff;  
-    dgdeh = dgde & ~0x1ff;  
-    dbdeh = dbde & ~0x1ff;  
-    dadeh = dade & ~0x1ff;  
-    dzdeh = dzde & ~0x1ff;
+  if (do_offset) {
+    int32_t ewdehvars[8];
+    int32_t ewdyhvars[8];
 
-    dsdyh = dsdy & ~0x1ff;
-    dtdyh = dtdy & ~0x1ff;
-    dwdyh = dwdy & ~0x1ff;
-    drdyh = drdy & ~0x1ff;
-    dgdyh = dgdy & ~0x1ff;
-    dbdyh = dbdy & ~0x1ff;
-    dadyh = dady & ~0x1ff;
-    dzdyh = dzdy & ~0x1ff;
-
-
-    
-    dsdiff = dsdeh - dsdyh;
-    dsdiff -= (dsdiff >> 2);
-    dtdiff = dtdeh - dtdyh;
-    dtdiff -= (dtdiff >> 2);
-    dwdiff = dwdeh - dwdyh;
-    dwdiff -= (dwdiff >> 2);
-    drdiff = drdeh - drdyh;
-    drdiff -= (drdiff >> 2);
-    dgdiff = dgdeh - dgdyh;
-    dgdiff -= (dgdiff >> 2);
-    dbdiff = dbdeh - dbdyh;
-    dbdiff -= (dbdiff >> 2);
-    dadiff = dadeh - dadyh;
-    dadiff -= (dadiff >> 2);
-    dzdiff = dzdeh - dzdyh;
-    dzdiff -= (dzdiff >> 2);
+    ClearLow9(ewdehvars, ewdevars);
+    ClearLow9(ewdyhvars, ewdyvars);
+    DiffASR2(diffvars, ewdehvars, ewdyhvars);
   }
+
   else
-    dsdiff = dtdiff = dwdiff = drdiff = dgdiff = dbdiff = dadiff = dzdiff = 0;
+    memset(diffvars, 0, sizeof(diffvars));
 
   int xfrac = 0;
+  int32_t ewdxhvars[8];
 
-  int dsdxh, dtdxh, dwdxh, drdxh, dgdxh, dbdxh, dadxh, dzdxh;
   if (other_modes.cycle_type != CYCLE_TYPE_COPY)
-  {
-    dsdxh = (dsdx >> 8) & ~1;
-    dtdxh = (dtdx >> 8) & ~1;
-    dwdxh = (dwdx >> 8) & ~1;
-    drdxh = (drdx >> 8) & ~1;
-    dgdxh = (dgdx >> 8) & ~1;
-    dbdxh = (dbdx >> 8) & ~1;
-    dadxh = (dadx >> 8) & ~1;
-    dzdxh = (dzdx >> 8) & ~1;
-  }
+    ASR8ClearLow(ewdxhvars, ewdxvars);
   else
-    dsdxh = dtdxh = dwdxh = drdxh = dgdxh = dbdxh = dadxh = dzdxh = 0;
-
-
-
-
+    memset(ewdxhvars, 0, sizeof(ewdxhvars));
 
 #define ADJUST_ATTR_PRIM()    \
 {             \
-  span[j].s = ((s & ~0x1ff) + dsdiff - (xfrac * dsdxh)) & ~0x3ff;       \
-  span[j].t = ((t & ~0x1ff) + dtdiff - (xfrac * dtdxh)) & ~0x3ff;       \
-  span[j].w = ((w & ~0x1ff) + dwdiff - (xfrac * dwdxh)) & ~0x3ff;       \
-  span[j].r = ((r & ~0x1ff) + drdiff - (xfrac * drdxh)) & ~0x3ff;       \
-  span[j].g = ((g & ~0x1ff) + dgdiff - (xfrac * dgdxh)) & ~0x3ff;       \
-  span[j].b = ((b & ~0x1ff) + dbdiff - (xfrac * dbdxh)) & ~0x3ff;       \
-  span[j].a = ((a & ~0x1ff) + dadiff - (xfrac * dadxh)) & ~0x3ff;       \
-  span[j].z = ((z & ~0x1ff) + dzdiff - (xfrac * dzdxh)) & ~0x3ff;       \
-}
-
-
-#define ADDVALUES_PRIM() {  \
-      s += dsde;  \
-      t += dtde;  \
-      w += dwde; \
-      r += drde; \
-      g += dgde; \
-      b += dbde; \
-      a += dade; \
-      z += dzde; \
+  span[j].s = ((ewvars[EW_S] & ~0x1ff) + diffvars[EWDIFF_DSDIFF] - (xfrac * ewdxhvars[EWDXH_DSDXH])) & ~0x3ff;       \
+  span[j].t = ((ewvars[EW_T] & ~0x1ff) + diffvars[EWDIFF_DTDIFF] - (xfrac * ewdxhvars[EWDXH_DTDXH])) & ~0x3ff;       \
+  span[j].w = ((ewvars[EW_W] & ~0x1ff) + diffvars[EWDIFF_DWDIFF] - (xfrac * ewdxhvars[EWDXH_DWDXH])) & ~0x3ff;       \
+  span[j].r = ((ewvars[EW_R] & ~0x1ff) + diffvars[EWDIFF_DRDIFF] - (xfrac * ewdxhvars[EWDXH_DRDXH])) & ~0x3ff;       \
+  span[j].g = ((ewvars[EW_G] & ~0x1ff) + diffvars[EWDIFF_DGDIFF] - (xfrac * ewdxhvars[EWDXH_DGDXH])) & ~0x3ff;       \
+  span[j].b = ((ewvars[EW_B] & ~0x1ff) + diffvars[EWDIFF_DBDIFF] - (xfrac * ewdxhvars[EWDXH_DBDXH])) & ~0x3ff;       \
+  span[j].a = ((ewvars[EW_A] & ~0x1ff) + diffvars[EWDIFF_DADIFF] - (xfrac * ewdxhvars[EWDXH_DADXH])) & ~0x3ff;       \
+  span[j].z = ((ewvars[EW_Z] & ~0x1ff) + diffvars[EWDIFF_DZDIFF] - (xfrac * ewdxhvars[EWDXH_DZDXH])) & ~0x3ff;       \
 }
 
   int32_t maxxmx, minxmx, maxxhx, minxhx;
@@ -5865,9 +5878,7 @@ static void edgewalker_for_prims(int32_t* ewdata)
     }
 
     if (spix == 3)
-    {
-      ADDVALUES_PRIM();
-    }
+      AddVectors(ewvars, ewvars, ewdevars);
 
     xleft += xleft_inc;
     xright += xright_inc;
@@ -5948,9 +5959,7 @@ static void edgewalker_for_prims(int32_t* ewdata)
     }
 
     if (spix == 3)
-    {
-      ADDVALUES_PRIM();
-    }
+      AddVectors(ewvars, ewvars, ewdevars);
 
     xleft += xleft_inc;
     xright += xright_inc;
