@@ -51,6 +51,15 @@ typedef char bool;
 #endif
 
 /* ============================================================================
+ *  align(x): Aligns data to a boundary.
+ * ========================================================================= */
+#ifdef __GNUC__
+#define align(x) __attribute__ ((aligned(x)))
+#else
+#define align(x)
+#endif
+
+/* ============================================================================
  *  debug(x): Prints messages only when DNDEBUG is not defined.
  * ========================================================================= */
 #ifndef NDEBUG

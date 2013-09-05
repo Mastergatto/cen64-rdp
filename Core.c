@@ -1,15 +1,17 @@
+#include "Common.h"
 #include "Core.h"
 #include "CPU.h"
 #include "Definitions.h"
 #include "Externs.h"
+#include "Helpers.h"
 #include "NormalROM.h"
 #include "Registers.h"
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 #define SIGN16(x) ((int16_t)(x))
 #define SIGN8(x)  ((int8_t)(x))
@@ -99,15 +101,18 @@ typedef struct
 static SPAN span[1024];
 uint32_t cvgbuf[1024];
 
+enum SpanType {
+  SPAN_DS,
+  SPAN_DT,
+  SPAN_DW,
+  SPAN_DR,
+  SPAN_DG,
+  SPAN_DB,
+  SPAN_DA,
+  SPAN_DZ,
+};
 
-static int spans_ds;
-static int spans_dt;
-static int spans_dw;
-static int spans_dr;
-static int spans_dg;
-static int spans_db;
-static int spans_da;
-static int spans_dz;
+static int32_t spans[8];
 static int spans_dzpix;
 
 int spans_drdy, spans_dgdy, spans_dbdy, spans_dady, spans_dzdy;
@@ -4002,33 +4007,12 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
 
   int i, j;
   
-  int drinc, dginc, dbinc, dainc, dzinc, dsinc, dtinc, dwinc;
-  int xinc;
+  int32_t dincs[8];
+  int32_t xinc;
 
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4036,7 +4020,7 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4091,14 +4075,14 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
     
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
-      s += (dsinc * scdiff);
-      t += (dtinc * scdiff);
-      w += (dwinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
+      s += (dincs[SPAN_DS] * scdiff);
+      t += (dincs[SPAN_DT] * scdiff);
+      w += (dincs[SPAN_DW] * scdiff);
     }
     sigs.startspan = 1;
 
@@ -4120,7 +4104,7 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
       lookup_cvmask_derivatives(cvgbuf[x], &offx, &offy, &curpixel_cvg, &curpixel_cvbit);
       
 
-      get_texel1_1cycle(&news, &newt, s, t, w, dsinc, dtinc, dwinc, i, &sigs);
+      get_texel1_1cycle(&news, &newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], i, &sigs);
 
       
       
@@ -4134,7 +4118,7 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
         tcdiv_ptr(ss, st, sw, &sss, &sst);
 
         
-        tclod_1cycle_current(&sss, &sst, news, newt, s, t, w, dsinc, dtinc, dwinc, i, prim_tile, &tile1, &sigs);
+        tclod_1cycle_current(&sss, &sst, news, newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], i, prim_tile, &tile1, &sigs);
         
         
         
@@ -4149,11 +4133,11 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
       sigs.endspan = sigs.preendspan;
       sigs.preendspan = (j == (length - 2));
 
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
       
-      tclod_1cycle_next(&news, &newt, s, t, w, dsinc, dtinc, dwinc, i, prim_tile, &newtile, &sigs, &prelodfrac);      
+      tclod_1cycle_next(&news, &newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], i, prim_tile, &newtile, &sigs, &prelodfrac);      
       
       texture_pipeline_cycle(&texel1_color, &texel1_color, news, newt, newtile, 0);
 
@@ -4176,11 +4160,11 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
       
       
       
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -4206,32 +4190,12 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int drinc, dginc, dbinc, dainc, dzinc, dsinc, dtinc, dwinc;
-  int xinc;
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+  int32_t dincs[8];
+  int32_t xinc;
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4239,7 +4203,7 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4291,14 +4255,14 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
-      s += (dsinc * scdiff);
-      t += (dtinc * scdiff);
-      w += (dwinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
+      s += (dincs[SPAN_DS] * scdiff);
+      t += (dincs[SPAN_DT] * scdiff);
+      w += (dincs[SPAN_DW] * scdiff);
     }
 
     for (j = 0; j <= length; j++)
@@ -4319,7 +4283,7 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
 
       tcdiv_ptr(ss, st, sw, &sss, &sst);
 
-      tclod_1cycle_current_simple(&sss, &sst, s, t, w, dsinc, dtinc, dwinc, i, prim_tile, &tile1, &sigs);
+      tclod_1cycle_current_simple(&sss, &sst, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], i, prim_tile, &tile1, &sigs);
 
       texture_pipeline_cycle(&texel0_color, &texel0_color, sss, sst, tile1, 0);
 
@@ -4339,14 +4303,14 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
         }
       }
 
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -4368,27 +4332,12 @@ void render_spans_1cycle_notex(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int drinc, dginc, dbinc, dainc, dzinc;
-  int xinc;
+  int32_t dincs[8];
+  int32_t xinc;
 
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    xinc = -1;
-  }
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
   
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4396,7 +4345,7 @@ void render_spans_1cycle_notex(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4441,11 +4390,11 @@ void render_spans_1cycle_notex(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
     }
 
     for (j = 0; j <= length; j++)
@@ -4473,11 +4422,11 @@ void render_spans_1cycle_notex(int start, int end, int tilenum, int flip)
             z_store(zbcur, sz, dzpixenc);
         }
       }
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -4511,32 +4460,12 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int drinc, dginc, dbinc, dainc, dzinc, dsinc, dtinc, dwinc;
-  int xinc;
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+  int32_t dincs[8];
+  int32_t xinc;
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4544,7 +4473,7 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4602,14 +4531,14 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
-      s += (dsinc * scdiff);
-      t += (dtinc * scdiff);
-      w += (dwinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
+      s += (dincs[SPAN_DS] * scdiff);
+      t += (dincs[SPAN_DT] * scdiff);
+      w += (dincs[SPAN_DW] * scdiff);
     }
     sigs.startspan = 1;
 
@@ -4627,7 +4556,7 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
 
       lookup_cvmask_derivatives(cvgbuf[x], &offx, &offy, &curpixel_cvg, &curpixel_cvbit);
 
-      get_nexttexel0_2cycle(&news, &newt, s, t, w, dsinc, dtinc, dwinc);
+      get_nexttexel0_2cycle(&news, &newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW]);
       
       if (!sigs.startspan)
       {
@@ -4639,7 +4568,7 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
       {
         tcdiv_ptr(ss, st, sw, &sss, &sst);
 
-        tclod_2cycle_current(&sss, &sst, news, newt, s, t, w, dsinc, dtinc, dwinc, prim_tile, &tile1, &tile2);
+        tclod_2cycle_current(&sss, &sst, news, newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], prim_tile, &tile1, &tile2);
         
 
         
@@ -4649,11 +4578,11 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
         sigs.startspan = 0;
       }
 
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
 
-      tclod_2cycle_next(&news, &newt, s, t, w, dsinc, dtinc, dwinc, prim_tile, &newtile1, &newtile2, &prelodfrac);
+      tclod_2cycle_next(&news, &newt, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], prim_tile, &newtile1, &newtile2, &prelodfrac);
 
       texture_pipeline_cycle(&nexttexel_color, &nexttexel_color, news, newt, newtile1, 0);
       texture_pipeline_cycle(&nexttexel1_color, &nexttexel_color, news, newt, newtile2, 1);
@@ -4694,11 +4623,11 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
       memory_color = pre_memory_color;
       pastblshifta = blshifta;
       pastblshiftb = blshiftb;
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -4725,32 +4654,12 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int drinc, dginc, dbinc, dainc, dzinc, dsinc, dtinc, dwinc;
-  int xinc;
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+  int32_t dincs[8];
+  int32_t xinc;
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4758,7 +4667,7 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4808,14 +4717,14 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
-      s += (dsinc * scdiff);
-      t += (dtinc * scdiff);
-      w += (dwinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
+      s += (dincs[SPAN_DS] * scdiff);
+      t += (dincs[SPAN_DT] * scdiff);
+      w += (dincs[SPAN_DW] * scdiff);
     }
 
     for (j = 0; j <= length; j++)
@@ -4833,7 +4742,7 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
       
       tcdiv_ptr(ss, st, sw, &sss, &sst);
 
-      tclod_2cycle_current_simple(&sss, &sst, s, t, w, dsinc, dtinc, dwinc, prim_tile, &tile1, &tile2);
+      tclod_2cycle_current_simple(&sss, &sst, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], prim_tile, &tile1, &tile2);
         
       texture_pipeline_cycle(&texel0_color, &texel0_color, sss, sst, tile1, 0);
       texture_pipeline_cycle(&texel1_color, &texel0_color, sss, sst, tile2, 1);
@@ -4858,14 +4767,14 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
       memory_color = pre_memory_color;
       pastblshifta = blshifta;
       pastblshiftb = blshiftb;
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -4890,32 +4799,12 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int drinc, dginc, dbinc, dainc, dzinc, dsinc, dtinc, dwinc;
+  int32_t dincs[8];
   int xinc;
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -4923,7 +4812,7 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -4973,14 +4862,14 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
-      s += (dsinc * scdiff);
-      t += (dtinc * scdiff);
-      w += (dwinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
+      s += (dincs[SPAN_DS] * scdiff);
+      t += (dincs[SPAN_DT] * scdiff);
+      w += (dincs[SPAN_DW] * scdiff);
     }
 
     for (j = 0; j <= length; j++)
@@ -4998,7 +4887,7 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
       
       tcdiv_ptr(ss, st, sw, &sss, &sst);
 
-      tclod_2cycle_current_notexel1(&sss, &sst, s, t, w, dsinc, dtinc, dwinc, prim_tile, &tile1);
+      tclod_2cycle_current_notexel1(&sss, &sst, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], prim_tile, &tile1);
       
       
       texture_pipeline_cycle(&texel0_color, &texel0_color, sss, sst, tile1, 0);
@@ -5023,14 +4912,14 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
       memory_color = pre_memory_color;
       pastblshifta = blshifta;
       pastblshiftb = blshiftb;
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -5051,26 +4940,12 @@ void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
   uint32_t prewrap;
   uint32_t curpixel_cvg, curpixel_cvbit, curpixel_memcvg;
 
-  int drinc, dginc, dbinc, dainc, dzinc;
-  int xinc;
-  if (flip)
-  {
-    drinc = spans_dr;
-    dginc = spans_dg;
-    dbinc = spans_db;
-    dainc = spans_da;
-    dzinc = spans_dz;
-    xinc = 1;
-  }
-  else
-  {
-    drinc = -spans_dr;
-    dginc = -spans_dg;
-    dbinc = -spans_db;
-    dainc = -spans_da;
-    dzinc = -spans_dz;
-    xinc = -1;
-  }
+  int32_t dincs[8];
+  int32_t xinc;
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int dzpix;
   if (!other_modes.z_source_sel)
@@ -5078,7 +4953,7 @@ void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
   else
   {
     dzpix = primitive_delta_z;
-    dzinc = spans_cdz = spans_dzdy = 0;
+    dincs[SPAN_DZ] = spans_cdz = spans_dzdy = 0;
   }
   int dzpixenc = dz_compress(dzpix);
 
@@ -5124,11 +4999,11 @@ void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
 
     if (scdiff)
     {
-      r += (drinc * scdiff);
-      g += (dginc * scdiff);
-      b += (dbinc * scdiff);
-      a += (dainc * scdiff);
-      z += (dzinc * scdiff);
+      r += (dincs[SPAN_DR] * scdiff);
+      g += (dincs[SPAN_DG] * scdiff);
+      b += (dincs[SPAN_DB] * scdiff);
+      a += (dincs[SPAN_DA] * scdiff);
+      z += (dincs[SPAN_DZ] * scdiff);
     }
 
     for (j = 0; j <= length; j++)
@@ -5161,11 +5036,11 @@ void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
       memory_color = pre_memory_color;
       pastblshifta = blshifta;
       pastblshiftb = blshiftb;
-      r += drinc;
-      g += dginc;
-      b += dbinc;
-      a += dainc;
-      z += dzinc;
+      r += dincs[SPAN_DR];
+      g += dincs[SPAN_DG];
+      b += dincs[SPAN_DB];
+      a += dincs[SPAN_DA];
+      z += dincs[SPAN_DZ];
       
       x += xinc;
       curpixel += xinc;
@@ -5254,22 +5129,12 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
   int tile1 = tilenum;
   int prim_tile = tilenum;
 
-  int dsinc, dtinc, dwinc;
-  int xinc;
-  if (flip)
-  {
-    dsinc = spans_ds;
-    dtinc = spans_dt;
-    dwinc = spans_dw;
-    xinc = 1;
-  }
-  else
-  {
-    dsinc = -spans_ds;
-    dtinc = -spans_dt;
-    dwinc = -spans_dw;
-    xinc = -1;
-  }
+  int32_t dincs[8];
+  int32_t xinc;
+
+  FlipSigns(dincs, spans, flip);
+  assert((flip & 1) == flip);
+  xinc = FlipLUT[flip];
 
   int xstart = 0, xendsc;
   int s = 0, t = 0, w = 0, ss = 0, st = 0, sw = 0, sss = 0, sst = 0, ssw = 0;
@@ -5318,7 +5183,7 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
 
       tcdiv_ptr(ss, st, sw, &sss, &sst);
       
-      tclod_copy(&sss, &sst, s, t, w, dsinc, dtinc, dwinc, prim_tile, &tile1);
+      tclod_copy(&sss, &sst, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], prim_tile, &tile1);
       
       
       
@@ -5386,9 +5251,9 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
         copywmask--;
       }
       
-      s += dsinc;
-      t += dtinc;
-      w += dwinc;
+      s += dincs[SPAN_DS];
+      t += dincs[SPAN_DT];
+      w += dincs[SPAN_DW];
       fbptr += fbptr_advance;
     }
     }
@@ -5404,8 +5269,8 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
   int i, j;
 
   int dsinc, dtinc;
-  dsinc = spans_ds;
-  dtinc = spans_dt;
+  dsinc = spans[SPAN_DS];
+  dtinc = spans[SPAN_DT];
 
   int s, t;
   int ss, st;
@@ -5729,14 +5594,14 @@ static void edgewalker_for_prims(int32_t* ewdata)
   
   
 
-  spans_ds = dsdx & ~0x1f;
-  spans_dt = dtdx & ~0x1f;
-  spans_dw = dwdx & ~0x1f;
-  spans_dr = drdx & ~0x1f;
-  spans_dg = dgdx & ~0x1f;
-  spans_db = dbdx & ~0x1f;
-  spans_da = dadx & ~0x1f;
-  spans_dz = dzdx;
+  spans[SPAN_DS] = dsdx & ~0x1f;
+  spans[SPAN_DT] = dtdx & ~0x1f;
+  spans[SPAN_DW] = dwdx & ~0x1f;
+  spans[SPAN_DR] = drdx & ~0x1f;
+  spans[SPAN_DG] = dgdx & ~0x1f;
+  spans[SPAN_DB] = dbdx & ~0x1f;
+  spans[SPAN_DA] = dadx & ~0x1f;
+  spans[SPAN_DZ] = dzdx;
   
   
   spans_drdy = drdy >> 14;
@@ -5749,15 +5614,15 @@ static void edgewalker_for_prims(int32_t* ewdata)
   spans_dbdy = SIGN(spans_dbdy, 13);
   spans_dady = SIGN(spans_dady, 13);
   spans_dzdy = SIGN(spans_dzdy, 22);
-  spans_cdr = spans_dr >> 14;
+  spans_cdr = spans[SPAN_DR] >> 14;
   spans_cdr = SIGN(spans_cdr, 13);
-  spans_cdg = spans_dg >> 14;
+  spans_cdg = spans[SPAN_DG] >> 14;
   spans_cdg = SIGN(spans_cdg, 13);
-  spans_cdb = spans_db >> 14;
+  spans_cdb = spans[SPAN_DB] >> 14;
   spans_cdb = SIGN(spans_cdb, 13);
-  spans_cda = spans_da >> 14;
+  spans_cda = spans[SPAN_DA] >> 14;
   spans_cda = SIGN(spans_cda, 13);
-  spans_cdz = spans_dz >> 10;
+  spans_cdz = spans[SPAN_DZ] >> 10;
   spans_cdz = SIGN(spans_cdz, 22);
   
   spans_dsdy = dsdy & ~0x7fff;
@@ -6156,9 +6021,9 @@ static void edgewalker_for_loads(int32_t* lewdata)
   dsdy = 0;
   dtdy = (lewdata[8] & 0xffff) << 16;
 
-  spans_ds = dsdx & ~0x1f;
-  spans_dt = dtdx & ~0x1f;
-  spans_dw = 0;
+  spans[SPAN_DS] = dsdx & ~0x1f;
+  spans[SPAN_DT] = dtdx & ~0x1f;
+  spans[SPAN_DW] = 0;
 
   
   
