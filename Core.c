@@ -86,14 +86,6 @@ uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
 uint32_t ptr_onstart = 0;
 
-extern FILE* zeldainfo;
-
-uint32_t old_vi_origin = 0;
-int32_t oldvstart = 1337;
-uint32_t oldhstart = 0;
-uint32_t oldsomething = 0;
-uint32_t prevwasblank = 0;
-uint32_t double_stretch = 0;
 int blshifta = 0, blshiftb = 0, pastblshifta = 0, pastblshiftb = 0;
 uint32_t plim = 0x3fffff;
 uint32_t idxlim16 = 0x1fffff;
@@ -130,6 +122,7 @@ enum SpanType {
 
 static int32_t spans[8];
 static int spans_dzpix;
+static int32_t ewdata[44] align(16);
 
 int spans_drdy, spans_dgdy, spans_dbdy, spans_dady, spans_dzdy;
 int spans_cdr, spans_cdg, spans_cdb, spans_cda, spans_cdz;
@@ -529,20 +522,6 @@ int IsBadPtrW32(void *ptr, uint32_t bytes);
 uint32_t vi_integer_sqrt(uint32_t a);
 void deduce_derivatives(void);
 static int32_t irand();
-
-void dump_buffer4kb(char* Name, void* Buff);
-void dump_buffer(char* Name, void* Buff,uint32_t Bytes);
-void dump_tmem_and_exit(char* Name);
-void col_decode16(uint16_t* addr, COLOR* col);
-void show_combiner_equation(void);
-void show_blender_equation(void);
-void showtile(uint32_t tilenum, int stop, int clamped);
-void show_tri_command(void);
-uint32_t compare_tri_command(uint32_t w0, uint32_t w1, uint32_t w2);
-void show_color(COLOR* col);
-void show_current_cfb(int isviorigin);
-int getdebugcolor(void);
-void bytefill_tmem(char byte);
 
 static int32_t k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0;
 static int32_t lod_frac = 0;
@@ -5626,10 +5605,10 @@ static void edgewalker_for_prims(const int32_t* ewdata)
   int32_t xl = 0, xm = 0, xh = 0;
   int32_t dxldy = 0, dxhdy = 0, dxmdy = 0;
 
-  int32_t ewvars[8];
-  int32_t ewdxvars[8];
-  int32_t ewdyvars[8];
-  int32_t ewdevars[8];
+  static int32_t ewvars[8] align(16);
+  static int32_t ewdxvars[8] align(16);
+  static int32_t ewdyvars[8] align(16);
+  static int32_t ewdevars[8] align(16);
 
   if (other_modes.f.stalederivs)
   {
@@ -6548,7 +6527,6 @@ static void rdp_noop(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_noshade(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 8 * sizeof(int32_t));
   memset(&ewdata[8], 0, 36 * sizeof(int32_t));
   edgewalker_for_prims(ewdata);
@@ -6556,7 +6534,6 @@ static void rdp_tri_noshade(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_noshade_z(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 8 * sizeof(int32_t));
   memset(&ewdata[8], 0, 32 * sizeof(int32_t));
   memcpy(&ewdata[40], &rdp_cmd_data[rdp_cmd_cur + 8], 4 * sizeof(int32_t));
@@ -6565,7 +6542,6 @@ static void rdp_tri_noshade_z(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_tex(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 8 * sizeof(int32_t));
   memset(&ewdata[8], 0, 16 * sizeof(int32_t));
   memcpy(&ewdata[24], &rdp_cmd_data[rdp_cmd_cur + 8], 16 * sizeof(int32_t));
@@ -6575,7 +6551,6 @@ static void rdp_tri_tex(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_tex_z(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 8 * sizeof(int32_t));
   memset(&ewdata[8], 0, 16 * sizeof(int32_t));
   memcpy(&ewdata[24], &rdp_cmd_data[rdp_cmd_cur + 8], 16 * sizeof(int32_t));
@@ -6585,7 +6560,6 @@ static void rdp_tri_tex_z(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_shade(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 24 * sizeof(int32_t));
   memset(&ewdata[24], 0, 20 * sizeof(int32_t));
   edgewalker_for_prims(ewdata);
@@ -6593,7 +6567,6 @@ static void rdp_tri_shade(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_shade_z(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 24 * sizeof(int32_t));
   memset(&ewdata[24], 0, 16 * sizeof(int32_t));
   memcpy(&ewdata[40], &rdp_cmd_data[rdp_cmd_cur + 24], 4 * sizeof(int32_t));
@@ -6602,7 +6575,6 @@ static void rdp_tri_shade_z(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_texshade(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 40 * sizeof(int32_t));
   memset(&ewdata[40], 0, 4 * sizeof(int32_t));
   edgewalker_for_prims(ewdata);
@@ -6610,7 +6582,6 @@ static void rdp_tri_texshade(uint32_t w1, uint32_t w2)
 
 static void rdp_tri_texshade_z(uint32_t w1, uint32_t w2)
 {
-  int32_t ewdata[44];
   memcpy(&ewdata[0], &rdp_cmd_data[rdp_cmd_cur], 44 * sizeof(int32_t));
   edgewalker_for_prims(ewdata);
 }
@@ -6640,8 +6611,6 @@ static void rdp_tex_rect(uint32_t w1, uint32_t w2)
 
   uint32_t xlint = (xl >> 2) & 0x3ff;
   uint32_t xhint = (xh >> 2) & 0x3ff;
-
-  int32_t ewdata[44];
 
   ewdata[0] = (0x24 << 24) | ((0x80 | tilenum) << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
@@ -6701,8 +6670,6 @@ static void rdp_tex_rect_flip(uint32_t w1, uint32_t w2)
 
   uint32_t xlint = (xl >> 2) & 0x3ff;
   uint32_t xhint = (xh >> 2) & 0x3ff;
-
-  int32_t ewdata[44];
 
   ewdata[0] = (0x25 << 24) | ((0x80 | tilenum) << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
@@ -7087,8 +7054,6 @@ static void rdp_fill_rect(uint32_t w1, uint32_t w2)
 
   uint32_t xlint = (xl >> 2) & 0x3ff;
   uint32_t xhint = (xh >> 2) & 0x3ff;
-
-  int32_t ewdata[44];
 
   ewdata[0] = (0x3680 << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
@@ -9899,606 +9864,5 @@ static void lodfrac_lodtile_signals(int lodclamp, int32_t lod, uint32_t* l_tile,
   *l_tile = ltil;
   *magnify = mag;
   lod_frac = lf;
-}
-
-
-
-void dump_buffer4kb(char* Name, void* Buff)
-{
-  FILE* Cur = fopen(Name,"wb");
-  fwrite(Buff,1,4096,Cur);
-  fclose(Cur);
-}
-
-void dump_buffer(char* Name, void* Buff,uint32_t Bytes)
-{
-  FILE* Cur = fopen(Name,"wb");
-  fwrite(Buff,1,Bytes,Cur);
-  fclose(Cur);
-}
-
-void dump_tmem_and_exit(char* Name)
-{
-  dump_buffer4kb(Name,TMEM);
-  exit(0);
-}
-
-void col_decode16(uint16_t* addr, COLOR* col)
-{
-  col->r = GET_HI(*addr);
-  col->g = GET_MED(*addr);
-  col->b = GET_LOW(*addr);
-  col->a = (*addr & 1) ? 0xff : 0;
-}
-
-void show_combiner_equation(void)
-{
-const char *saRGBText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "1",      "NOISE",
-  "0",        "0",        "0",        "0",
-  "0",        "0",        "0",        "0"
-};
-
-const char *sbRGBText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "CENTER",     "K4",
-  "0",        "0",        "0",        "0",
-  "0",        "0",        "0",        "0"
-};
-  
-const char *mRGBText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "SCALE",      "PREV_ALPHA",
-  "TEXEL0_ALPHA",   "TEXEL1_ALPHA",   "PRIM_ALPHA", "SHADE_ALPHA",
-  "ENV_ALPHA",    "LOD_FRACTION",   "PRIM_LOD_FRAC",  "K5",
-  "0",        "0",        "0",        "0",
-  "0",        "0",        "0",        "0",
-  "0",        "0",        "0",        "0",
-  "0",        "0",        "0",        "0"
-  };
-
-const char *aRGBText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "1",        "0",
-};
-
-const char *saAText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "1",        "0",
-};
-
-const char *sbAText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "1",        "0",
-};
-  
-const char *mAText[] =
-{
-  "LOD_FRACTION",   "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "PRIM_LOD_FRAC",  "0",
-};
-
-const char *aAText[] =
-{
-  "PREV",     "TEXEL0",     "TEXEL1",     "PRIM", 
-  "SHADE",      "ENV",    "1",        "0",
-};
-
-if (other_modes.cycle_type!=CYCLE_TYPE_1 && other_modes.cycle_type!=CYCLE_TYPE_2)
-{
-  popmessage("show_combiner_equation not implemented for cycle type %d",other_modes.cycle_type);
-  return;
-}
-
-if (other_modes.cycle_type == CYCLE_TYPE_1)
-  popmessage("Combiner equation is (%s - %s) * %s + %s | (%s - %s) * %s + %s",saRGBText[combine.sub_a_rgb0],
-  sbRGBText[combine.sub_b_rgb0],mRGBText[combine.mul_rgb0],aRGBText[combine.add_rgb0],
-  saAText[combine.sub_a_a0],sbAText[combine.sub_b_a0],mAText[combine.mul_a0],aAText[combine.add_a0]);
-if (other_modes.cycle_type == CYCLE_TYPE_2)
-  popmessage("Combiner equation is (%s - %s) * %s + %s | (%s - %s) * %s + %s \n (%s - %s) * %s + %s | (%s - %s) * %s + %s",
-  saRGBText[combine.sub_a_rgb0],sbRGBText[combine.sub_b_rgb0],mRGBText[combine.mul_rgb0],
-  aRGBText[combine.add_rgb0],saAText[combine.sub_a_a0],sbAText[combine.sub_b_a0],
-  mAText[combine.mul_a0],aAText[combine.add_a0],
-  saRGBText[combine.sub_a_rgb1],sbRGBText[combine.sub_b_rgb1],mRGBText[combine.mul_rgb1],
-  aRGBText[combine.add_rgb1],saAText[combine.sub_a_a1],sbAText[combine.sub_b_a1],
-  mAText[combine.mul_a1],aAText[combine.add_a1]);
-uint32_t LocalDebugMode=0;
-if (LocalDebugMode)
-  popmessage("%d %d %d %d %d %d %d %d",combine.sub_a_rgb0,combine.sub_b_rgb0,combine.mul_rgb0,combine.add_rgb0,
-  combine.sub_a_a0,combine.sub_b_a0,combine.mul_a0,combine.add_a0);
-}
-
-void show_blender_equation(void)
-{
-const char * bRGBText[] = { "PREV", "MEMRGB", "BLEND", "FOG" };
-const char * bAText[2][4] = { {"PREVA", "FOGA", "SHADEA", "0"},
-                                     {"INVALPHA", "MEMA", "1", "0"}};
-if (other_modes.cycle_type!=CYCLE_TYPE_1 && other_modes.cycle_type!=CYCLE_TYPE_2)
-{
-  popmessage("show_blender_equation not implemented for cycle type %d",other_modes.cycle_type);
-  return;
-}
-if (other_modes.cycle_type == CYCLE_TYPE_1)
-  popmessage("Blender equation is %s * %s + %s * %s",bRGBText[other_modes.blend_m1a_0],
-  bAText[0][other_modes.blend_m1b_0],bRGBText[other_modes.blend_m2a_0],bAText[0][other_modes.blend_m2b_0]);
-if (other_modes.cycle_type == CYCLE_TYPE_2)
-  popmessage("Blender equation is %s * %s + %s * %s\n%s * %s + %s * %s",
-  bRGBText[other_modes.blend_m1a_0],bAText[0][other_modes.blend_m1b_0],
-  bRGBText[other_modes.blend_m2a_0],bAText[1][other_modes.blend_m2b_0],
-  bRGBText[other_modes.blend_m1a_1],bAText[0][other_modes.blend_m1b_1],
-  bRGBText[other_modes.blend_m2a_1],bAText[1][other_modes.blend_m2b_1]);
-}
-
-
-void showtile(uint32_t tilenum, int stop, int clamped)
-{
-#if 0
-  if (tilenum > 7)
-    fatalerror("showtile: tilenum > 7");
-  
-  if (fb_size!=PIXEL_SIZE_16BIT)
-    fatalerror("showtile: non 16bit frame buffer");
-  int taddr;
-  uint32_t tbase = tile[tilenum].tmem << 3;
-  uint32_t twidth = tile[tilenum].line << 3;
-  uint32_t tpal = tile[tilenum].palette;
-  uint32_t tformat = tile[tilenum].format;
-  uint32_t tsize = tile[tilenum].size;
-  if (tformat==4 && (tsize>1))
-    tformat = 0;
-  if (tformat==2 && (tsize>1))
-    tformat = 0;
-  if ((!tformat) && (tsize<2))
-    tformat = 2;
-
-  if (tformat & 1)
-    fatalerror("showtile: formats besides RGBA, CI and I are not implemented");
-
-  uint32_t nominalwidth = (tile[tilenum].sh >> 2) - (tile[tilenum].sl >> 2) + 1;
-  uint32_t nominalheight = (tile[tilenum].th >> 2) - (tile[tilenum].tl >> 2) + 1;
-  uint32_t height = clamped ? nominalheight : 479;
-  if (height > 479)
-    height = 479;
-  if (nominalheight == 1)
-    popmessage("showtile: alert");
-
-  if (clamped && nominalwidth < 1)
-    popmessage("showtile: non-positive nominalwidth");
-  
-  uint32_t s=0, t=0;
-  uint8_t *tc = TMEM;
-  uint16_t *tc16 = (uint16_t*)TMEM;
-  uint32_t* tc32 = (uint32_t*)TMEM;
-  uint32_t x = (620 - nominalwidth - 1);
-  if (nominalwidth > 619)
-    fatalerror("showtile: too large");
-
-  clearscreen(492,0,620,479,1);
-
-  uint32_t y = 0;
-  int32_t* d = 0;
-  
-  uint8_t r,g,b,a;
-  popmessage("showtile: tile %d taddr 0x%x tformat %d tsize %d clamps %d mirrors %d clampt %d mirrort %d masks %d maskt %d",
-    tilenum, tbase, tformat, tsize, tile[tilenum].cs, tile[tilenum].ms, tile[tilenum].ct, tile[tilenum].mt,
-    tile[tilenum].mask_s, tile[tilenum].mask_t);
-
-  res = IDirectDrawSurface_Lock(lpddsback, 0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_NOSYSLOCK, 0);
-  if (res != DD_OK)
-    fatalerror("showtile: Lock failed.");
-  PreScale = (int32_t*)ddsd.lpSurface;
-
-  switch (tformat)
-  {
-  case 0: 
-    {
-      switch (tsize)
-      {
-      case PIXEL_SIZE_16BIT:
-        {
-          for (t = 0; t < height; t++)
-          {
-            d = &PreScale[t * pitchindwords];
-            for (s = 0; s < nominalwidth; s++)
-            {
-              taddr = (tbase >> 1) + ((t) * (twidth >> 1)) + s;
-              taddr ^= ((t & 1) ? WORD_XOR_DWORD_SWAP : WORD_ADDR_XOR);
-              if (clamped && taddr > 0x7ff)
-                goto endrgb16;
-              taddr &= 0x7ff;
-              uint16_t c = tc16[taddr];
-              if (!other_modes.en_tlut)
-              {
-                r = GET_HI(c);
-                g = GET_MED(c);
-                b = GET_LOW(c);
-                a = (c & 1) ? 0xff : 0;
-              }
-              else
-              {
-                c = tlut[((c >> 8) & 0xff) << 2];
-                if (other_modes.tlut_type == 0)
-                {
-                  r = GET_HI(c);
-                  g = GET_MED(c);
-                  b = GET_LOW(c);
-                  a = (c & 1) ? 0xff : 0;
-                }
-                else
-                {
-                  r = g = b = (c >> 8) & 0xff;
-                  a = c & 0xff;
-                }
-              }
-              d[x + s] = (r << 16) | (g << 8) | b;
-            }
-          }
-endrgb16:
-          break;
-        }
-      case PIXEL_SIZE_32BIT:
-        {
-        if (other_modes.en_tlut)
-            popmessage("showtile: RGBA-32 with en_tlut not implemented");
-          for (t = 0; t < height; t++)
-          {
-            d = &PreScale[t * pitchindwords];
-            for (s = 0; s < nominalwidth; s++)
-            {
-              taddr = ((tbase >> 1) + ((t) * (twidth >> 1)) + s);
-              taddr ^= ((t & 1) ? WORD_XOR_DWORD_SWAP : WORD_ADDR_XOR);
-              taddr &= 0x3ff;
-              uint32_t c = tc16[taddr];
-              r = (c >> 8) & 0xff;
-              g = c & 0xff;
-              c = tc16[taddr | 0x400];
-              b = (c >>  8) & 0xff;
-              a = c & 0xff;
-              d[x + s] = (r << 16) | (g << 8) | b;
-            }
-          }
-          break;
-        }
-      default:
-        fatalerror("showtile: not 16-bit RGBA texel");
-        break;
-      }
-      break;
-    }
-  case 2: 
-  {
-    switch(tsize)
-    {
-    case PIXEL_SIZE_4BIT:
-    {
-      for (t = 0; t < height; t++)
-      {
-        d = &PreScale[t * pitchindwords];
-        for (s = 0; s < nominalwidth; s++)
-        {
-          taddr = (tbase + (t * twidth) + (s / 2)) ^ ((t & 1) ? BYTE_XOR_DWORD_SWAP : BYTE_ADDR_XOR);
-          taddr &= 0xfff;
-          uint8_t p;
-          uint16_t c;
-          if (other_modes.en_tlut)
-          {
-          taddr &= 0x7ff;
-          p = (s & 1) ? (tc[taddr] & 0xf) : (tc[taddr] >> 4);
-          c = tlut[((tpal << 4) | p) << 2];
-          if (other_modes.tlut_type == 0)
-          {
-            r = GET_HI(c);
-            g = GET_MED(c);
-            b = GET_LOW(c);
-            a = (c & 1) ? 0xff : 0;
-          }
-          else
-          {
-            p = ((s) & 1) ? (tc[taddr] & 0xf) : (tc[taddr] >> 4);
-            c = tlut[((tpal << 4) + p)<<2];
-            r = g = b = (c >> 8) & 0xff;
-            a = c & 0xff;
-          }
-          }
-          d[x + s] = (r << 16) | (g << 8) | b;
-        }
-      }
-    break;
-    }
-    case PIXEL_SIZE_8BIT:
-      {
-      for (t = 0; t < height; t++)
-      {
-        d = &PreScale[t * pitchindwords];
-        for (s = 0; s < nominalwidth; s++)
-        {
-          taddr = (tbase + (t * twidth) + (s)) ^ ((t & 1) ? BYTE_XOR_DWORD_SWAP : BYTE_ADDR_XOR);
-          taddr &= 0xfff;
-          uint8_t p = tc[taddr];
-          uint16_t c = tlut[p << 2];
-          if (other_modes.en_tlut)
-          {
-          if (other_modes.tlut_type == 0)
-          {
-            r = GET_HI(c);
-            g = GET_MED(c);
-            b = GET_LOW(c);
-            a = (c & 1) ? 0xff : 0;
-          }
-          else
-          {
-            r = g = b = (c >> 8) & 0xff;
-            a = c & 0xff;
-          }
-          }
-          d[x + s] = (r << 16) | (g << 8) | b;
-        }
-      }
-      break;
-      }
-    default: fatalerror("showtile: unknown CI tile");
-      break;
-    }
-    break;
-  }
-  case 4: 
-  {
-  switch (tsize)
-  {
-    case PIXEL_SIZE_4BIT:
-    {
-      for (t=0; t < height; t++)
-      {
-        d = &PreScale[t * pitchindwords];
-        for (s = 0; s < nominalwidth; s++)
-        {
-          taddr = (tbase + (t * twidth) + (s >> 1)) ^ ((t & 1) ? BYTE_XOR_DWORD_SWAP : BYTE_ADDR_XOR);
-          if (clamped && taddr > 0xfff)
-            goto endi4;
-          taddr &= 0xfff;
-          uint8_t byteval = tc[taddr];
-          uint8_t c = (s & 1) ? (byteval & 0xf) : ((byteval >> 4) & 0xf);
-          c |= (c << 4);
-          r = g = b = a = c;
-          d[x + s] = (r << 16) | (g << 8) | b;
-        }
-      }
-endi4:    
-      break;
-    }
-    case PIXEL_SIZE_8BIT:
-    {
-      for (t=0; t < height; t++)
-      {
-        d = &PreScale[t * pitchindwords];
-        for (s = 0; s < nominalwidth; s++)
-        {
-          taddr = (tbase + (t * twidth) + s) ^ ((t & 1) ? BYTE_XOR_DWORD_SWAP : BYTE_ADDR_XOR);
-          if (clamped && taddr >= 0xfff)
-            goto endi8;
-          taddr &= 0xfff;
-          uint8_t c = tc[taddr];
-          r = g = b = a = c;
-          d[x + s] = (r << 16) | (g << 8) | b;
-        }
-      }
-endi8:
-      break;
-    }
-    default:
-      fatalerror("showtile: unknown I texture size %d\n", tile[tilenum].size);
-      break;
-    }
-    break;
-  }
-  default:
-    fatalerror("showtile: formats besides I and CI are not implemented");
-    break;
-  }
-
-  res = IDirectDrawSurface_Unlock(lpddsback, 0);
-  if (res != DD_OK)
-    fatalerror("showtile: Unlock failed.");
-
-  src.bottom = 480;
-  res = IDirectDrawSurface_Blt(lpddsprimary, &dst, lpddsback,&src,DDBLT_WAIT,0);
-  if (res != DD_OK)
-    fatalerror("showtile: Blt failed.");
-
-  if (stop)
-  {
-  while(!GetAsyncKeyState(VK_TAB))
-  {
-    if (GetAsyncKeyState(VK_ADD))
-      showtile((tilenum + 1)&7,1,clamped);
-    else if (GetAsyncKeyState(VK_SUBTRACT))
-      showtile((tilenum - 1)&7,1,clamped);
-    else if (GetAsyncKeyState(0x43))
-    {
-      clamped = (!clamped) ? 1 : 0;
-      showtile(tilenum,1,clamped);
-    }
-  }
-  }
-#endif
-}
-
-void show_tri_command(void)
-{
-  popmessage("w0: 0x%08x, w1: 0x%08x, w2: 0x%08x",rdp_cmd_data[rdp_cmd_cur], rdp_cmd_data[rdp_cmd_cur + 1], rdp_cmd_data[rdp_cmd_cur + 2]);
-}
-
-uint32_t compare_tri_command(uint32_t w0, uint32_t w1, uint32_t w2)
-{
-  if (w0 == rdp_cmd_data[rdp_cmd_cur] && w1 == rdp_cmd_data[rdp_cmd_cur + 1] && w2 == rdp_cmd_data[rdp_cmd_cur + 2])
-    return 1;
-  else
-    return 0;
-}
-
-void show_color(COLOR* col)
-{
-  popmessage("R: 0x%x, G: 0x%x, B: 0x%x, A: 0x%x", col->r, col->g, col->b, col->a);
-}
-
-void show_current_cfb(int isviorigin)
-{
-#if 0
-  int i, j;
-  uint32_t final = 0;
-  uint32_t r1, g1, b1;
-  uint32_t col0, col1;
-  uint32_t fbaddr = isviorigin ? vi_origin : fb_address;
-  
-  int hres, vres;
-  int32_t hdiff = (vi_h_start & 0x3ff)-((vi_h_start>>16)&0x3ff);
-  if (hdiff <= 0)
-    return;
-  hres = ((vi_x_scale & 0xfff) * hdiff) / 0x400;
-  int32_t invisiblewidth = vi_width - hres;
-  
-  int32_t vdiff = (vi_v_start & 0x3ff)-((vi_v_start >> 16) & 0x3ff);
-  if (vdiff <= 0)
-    return;
-  vdiff >>= 1;
-  vres = ((vi_y_scale & 0xfff) * vdiff) / 0x400;
-
-  if (hres > 640 || vres > 480)
-    popmessage("hres=%d vres=%d", hres, vres);
-#ifdef WIN32
-  if (hres < 321 && vres < 241 && (GetAsyncKeyState(VK_SCROLL) || double_stretch == 2))
-  {
-    if (double_stretch==1)
-      double_stretch = 0;
-    else
-      double_stretch = 1;
-  }
-  if (hres > 320 || vres > 240)
-  {
-    if (GetAsyncKeyState(VK_SCROLL))
-      popmessage("Cannot double the resolution: %d %d",hres,vres);
-    if (double_stretch)
-      double_stretch = 2;
-    else
-      double_stretch = 0;
-  }
-#endif
-
-  res = IDirectDrawSurface_Lock(lpddsback, 0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_NOSYSLOCK, 0);
-  if (res != DD_OK)
-    fatalerror("show_current_cfb: Blt failed.");
-  PreScale = (int32_t*)ddsd.lpSurface;
-
-    switch (vi_control & 0x3)
-  {
-    case 0:   
-    case 1:
-    {
-      break;
-    }
-    case 2:   
-    {
-      uint32_t fbidx16 = (fbaddr & 0xffffff) >> 1;
-      for (j = 0; j < vres; j++)
-      {
-        int32_t *d, *e;
-        if (double_stretch != 1)
-          d = &PreScale[j * pitchindwords];
-        else
-        {
-          d = &PreScale[(j << 1) * pitchindwords];
-          e = &PreScale[((j << 1) + 1) * pitchindwords];
-        }
-    
-        for (i=0; i < hres; i++)
-        {
-          int r, g, b;
-          uint16_t pix;
-          
-          pix = RREADIDX16(fbidx16);
-          
-          r = GET_HI(pix);
-          g = GET_MED(pix);
-          b = GET_LOW(pix);
-          fbidx16++;
-          final = (r << 16) | (g << 8) | b;
-          if (double_stretch != 1)
-            d[i] = final;
-          else
-          {
-            d[i << 1] = final;
-            
-            if (i == (hres-1))
-            {
-              for (int k =0; k < hres; k ++)
-              {
-                col0 = d[k << 1];
-                col1 = d[(k << 1) + 2];
-                r1 = (((col0 >> 16)&0xff) + ((col1 >> 16)&0xff)) >> 1;
-                g1 = (((col0 >> 8)&0xff) + ((col1 >> 8)&0xff)) >> 1;
-                b1 = (((col0 >> 0)&0xff) + ((col1 >> 0)&0xff)) >> 1;
-                d[(k << 1) + 1] = (r1 << 16) | (g1 << 8) | b1;
-              }
-              memcpy(&e[0], &d[0], hres << 3);
-            }
-          }
-        }
-        fbidx16 +=invisiblewidth;
-      }
-      break;
-    }
-
-    case 3:   
-    {
-            uint32_t fbidx32 = (fbaddr & 0xffffff) >> 2;
-      for (j = 0; j < vres; j++)
-      {
-        int32_t* d = &PreScale[j * pitchindwords];
-        for (i = 0; i < hres; i++)
-        {
-          uint32_t pix = RREADIDX32(fbidx32);
-          fbidx32++;
-          d[i] = pix >> 8;
-        }
-        fbidx32 +=invisiblewidth;
-    }
-    break;
-    }
-
-        default:    
-      popmessage("Unknown framebuffer format %d\n", vi_control & 0x3);
-      break;
-  }
-  res = IDirectDrawSurface_Unlock(lpddsback, 0);
-  if (res != DD_OK)
-    fatalerror("show_current_cfb: Unlock failed.");
-
-  RECT srcrect = src;
-  srcrect.bottom = vres;
-  srcrect.right = hres;
-  RECT smallrect = dst;
-  smallrect.bottom = smallrect.top + vres + 1;
-  smallrect.right = smallrect.left + hres + 1;
-  res = IDirectDrawSurface_Blt(lpddsprimary, &smallrect, lpddsback, &srcrect, DDBLT_WAIT, 0);
-  if (res != DD_OK)
-    fatalerror("show_current_cfb: Blt failed");
-#endif
-}
-
-int getdebugcolor(void)
-{
-  return (irand() & 0x7f) + (irand() & 0x3f) + (irand() & 0x1f);
-}
-
-void bytefill_tmem(char byte)
-{
-  memset(TMEM, byte, 4096);
 }
 
