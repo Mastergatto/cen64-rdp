@@ -25,6 +25,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef USE_SSE
+#include <tmmintrin.h>
+#endif
+
 #define SIGN16(x) ((int16_t)(x))
 #define SIGN8(x)  ((int8_t)(x))
 
@@ -114,13 +118,13 @@ static SPAN span[1024];
 uint32_t cvgbuf[1024];
 
 enum SpanType {
-  SPAN_DS,
-  SPAN_DT,
-  SPAN_DW,
   SPAN_DR,
   SPAN_DG,
   SPAN_DB,
   SPAN_DA,
+  SPAN_DS,
+  SPAN_DT,
+  SPAN_DW,
   SPAN_DZ,
 };
 
@@ -5524,94 +5528,94 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
 }
 
 enum EdgeWalkerType {
-  EW_S,
-  EW_T,
-  EW_W,
   EW_R,
   EW_G,
   EW_B,
   EW_A,
+  EW_S,
+  EW_T,
+  EW_W,
   EW_Z,
 };
 
 enum EdgeWalkerDeType {
-  EWDE_DSDE,
-  EWDE_DTDE,
-  EWDE_DWDE,
   EWDE_DRDE,
   EWDE_DGDE,
   EWDE_DBDE,
   EWDE_DADE,
+  EWDE_DSDE,
+  EWDE_DTDE,
+  EWDE_DWDE,
   EWDE_DZDE,
 };
 
 enum EdgeWalkerDehType {
-  EWDEH_DSDEH,
-  EWDEH_DTDEH,
-  EWDEH_DWDEH,
   EWDEH_DRDEH,
   EWDEH_DGDEH,
   EWDEH_DBDEH,
   EWDEH_DADEH,
+  EWDEH_DSDEH,
+  EWDEH_DTDEH,
+  EWDEH_DWDEH,
   EWDEH_DZDEH,
 };
 
 enum EdgeWalkerDiffType {
-  EWDIFF_DSDIFF,
-  EWDIFF_DTDIFF,
-  EWDIFF_DWDIFF,
   EWDIFF_DRDIFF,
   EWDIFF_DGDIFF,
   EWDIFF_DBDIFF,
   EWDIFF_DADIFF,
+  EWDIFF_DSDIFF,
+  EWDIFF_DTDIFF,
+  EWDIFF_DWDIFF,
   EWDIFF_DZDIFF,
 };
 
 enum EdgeWalkerDxType {
-  EWDX_DSDX,
-  EWDX_DTDX,
-  EWDX_DWDX,
   EWDX_DRDX,
   EWDX_DGDX,
   EWDX_DBDX,
   EWDX_DADX,
+  EWDX_DSDX,
+  EWDX_DTDX,
+  EWDX_DWDX,
   EWDX_DZDX,
 };
 
 enum EdgeWalkerDxhType {
-  EWDXH_DSDXH,
-  EWDXH_DTDXH,
-  EWDXH_DWDXH,
   EWDXH_DRDXH,
   EWDXH_DGDXH,
   EWDXH_DBDXH,
   EWDXH_DADXH,
+  EWDXH_DSDXH,
+  EWDXH_DTDXH,
+  EWDXH_DWDXH,
   EWDXH_DZDXH,
 };
 
 enum EdgeWalkerDyType {
-  EWDY_DSDY,
-  EWDY_DTDY,
-  EWDY_DWDY,
   EWDY_DRDY,
   EWDY_DGDY,
   EWDY_DBDY,
   EWDY_DADY,
+  EWDY_DSDY,
+  EWDY_DTDY,
+  EWDY_DWDY,
   EWDY_DZDY,
 };
 
 enum EdgeWalkerDyhType {
-  EWDYH_DSDYH,
-  EWDYH_DTDYH,
-  EWDYH_DWDYH,
   EWDYH_DRDYH,
   EWDYH_DGDYH,
   EWDYH_DBDYH,
   EWDYH_DADYH,
+  EWDYH_DSDYH,
+  EWDYH_DTDYH,
+  EWDYH_DWDYH,
   EWDYH_DZDYH,
 };
 
-static void edgewalker_for_prims(int32_t* ewdata)
+static void edgewalker_for_prims(const int32_t* ewdata)
 {
   int j = 0;
   int xleft = 0, xright = 0, xleft_inc = 0, xright_inc = 0;
@@ -5650,40 +5654,12 @@ static void edgewalker_for_prims(int32_t* ewdata)
   dxhdy = (int32_t)ewdata[5];
   dxmdy = (int32_t)ewdata[7];
 
-  ewvars[EW_R]        = (ewdata[8] & 0xffff0000) | ((ewdata[12] >> 16) & 0x0000ffff);
-  ewvars[EW_G]        = ((ewdata[8] << 16) & 0xffff0000) | (ewdata[12] & 0x0000ffff);
-  ewvars[EW_B]        = (ewdata[9] & 0xffff0000) | ((ewdata[13] >> 16) & 0x0000ffff);
-  ewvars[EW_A]        = ((ewdata[9] << 16) & 0xffff0000) | (ewdata[13] & 0x0000ffff);
-  ewvars[EW_S]        = (ewdata[24] & 0xffff0000) | ((ewdata[28] >> 16) & 0x0000ffff);
-  ewvars[EW_T]        = ((ewdata[24] << 16) & 0xffff0000)  | (ewdata[28] & 0x0000ffff);
-  ewvars[EW_W]        = (ewdata[25] & 0xffff0000) | ((ewdata[29] >> 16) & 0x0000ffff);
-  ewvars[EW_Z]        = ewdata[40];
+  LoadEWPrimData(ewvars, ewdxvars, ewdata + 8);
+  LoadEWPrimData(ewdevars, ewdyvars, ewdata + 16);
 
-  ewdxvars[EWDX_DRDX] = (ewdata[10] & 0xffff0000) | ((ewdata[14] >> 16) & 0x0000ffff);
-  ewdxvars[EWDX_DGDX] = ((ewdata[10] << 16) & 0xffff0000) | (ewdata[14] & 0x0000ffff);
-  ewdxvars[EWDX_DBDX] = (ewdata[11] & 0xffff0000) | ((ewdata[15] >> 16) & 0x0000ffff);
-  ewdxvars[EWDX_DADX] = ((ewdata[11] << 16) & 0xffff0000) | (ewdata[15] & 0x0000ffff);
-  ewdxvars[EWDX_DSDX] = (ewdata[26] & 0xffff0000) | ((ewdata[30] >> 16) & 0x0000ffff);
-  ewdxvars[EWDX_DTDX] = ((ewdata[26] << 16) & 0xffff0000)  | (ewdata[30] & 0x0000ffff);
-  ewdxvars[EWDX_DWDX] = (ewdata[27] & 0xffff0000) | ((ewdata[31] >> 16) & 0x0000ffff);
+  ewvars[EW_Z] = ewdata[40];
   ewdxvars[EWDX_DZDX] = ewdata[41];
-
-  ewdevars[EWDE_DRDE] = (ewdata[16] & 0xffff0000) | ((ewdata[20] >> 16) & 0x0000ffff);
-  ewdevars[EWDE_DGDE] = ((ewdata[16] << 16) & 0xffff0000) | (ewdata[20] & 0x0000ffff);
-  ewdevars[EWDE_DBDE] = (ewdata[17] & 0xffff0000) | ((ewdata[21] >> 16) & 0x0000ffff);
-  ewdevars[EWDE_DADE] = ((ewdata[17] << 16) & 0xffff0000) | (ewdata[21] & 0x0000ffff);
-  ewdevars[EWDE_DSDE] = (ewdata[32] & 0xffff0000) | ((ewdata[36] >> 16) & 0x0000ffff);
-  ewdevars[EWDE_DTDE] = ((ewdata[32] << 16) & 0xffff0000)  | (ewdata[36] & 0x0000ffff);
-  ewdevars[EWDE_DWDE] = (ewdata[33] & 0xffff0000) | ((ewdata[37] >> 16) & 0x0000ffff);
   ewdevars[EWDE_DZDE] = ewdata[42];
-
-  ewdyvars[EWDY_DRDY] = (ewdata[18] & 0xffff0000) | ((ewdata[22] >> 16) & 0x0000ffff);
-  ewdyvars[EWDY_DGDY] = ((ewdata[18] << 16) & 0xffff0000) | (ewdata[22] & 0x0000ffff);
-  ewdyvars[EWDY_DBDY] = (ewdata[19] & 0xffff0000) | ((ewdata[23] >> 16) & 0x0000ffff);
-  ewdyvars[EWDY_DADY] = ((ewdata[19] << 16) & 0xffff0000) | (ewdata[23] & 0x0000ffff);
-  ewdyvars[EWDY_DSDY] = (ewdata[34] & 0xffff0000) | ((ewdata[38] >> 16) & 0x0000ffff);
-  ewdyvars[EWDY_DTDY] = ((ewdata[34] << 16) & 0xffff0000)  | (ewdata[38] & 0x0000ffff);
-  ewdyvars[EWDY_DWDY] = (ewdata[35] & 0xffff0000) | ((ewdata[39] >> 16) & 0x0000ffff);
   ewdyvars[EWDY_DZDY] = ewdata[43];
 
   int32_t dzdx = ewdxvars[EWDX_DZDX];
@@ -6666,6 +6642,7 @@ static void rdp_tex_rect(uint32_t w1, uint32_t w2)
   uint32_t xhint = (xh >> 2) & 0x3ff;
 
   int32_t ewdata[44];
+
   ewdata[0] = (0x24 << 24) | ((0x80 | tilenum) << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
   ewdata[2] = (xlint << 16) | ((xl & 3) << 14);
@@ -6726,6 +6703,7 @@ static void rdp_tex_rect_flip(uint32_t w1, uint32_t w2)
   uint32_t xhint = (xh >> 2) & 0x3ff;
 
   int32_t ewdata[44];
+
   ewdata[0] = (0x25 << 24) | ((0x80 | tilenum) << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
   ewdata[2] = (xlint << 16) | ((xl & 3) << 14);
@@ -7111,6 +7089,7 @@ static void rdp_fill_rect(uint32_t w1, uint32_t w2)
   uint32_t xhint = (xh >> 2) & 0x3ff;
 
   int32_t ewdata[44];
+
   ewdata[0] = (0x3680 << 16) | yl;
   ewdata[1] = (yl << 16) | yh;
   ewdata[2] = (xlint << 16) | ((xl & 3) << 14);

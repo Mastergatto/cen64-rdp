@@ -12,8 +12,10 @@
 
 #ifdef __cplusplus
 #include <cassert>
+#include <cstring>
 #else
 #include <assert.h>
+#include <string.h>
 #endif
 
 #ifdef USE_SSE
@@ -172,21 +174,21 @@ DiffASR2(int32_t *dest, const int32_t *srca, const int32_t *srcb) {
   _mm_store_si128((__m128i*) (dest + 4), dest2);
 #else
   dest[0] = srca[0] - srcb[0];
-  dest[0] -= (dsdiff >> 2);
+  dest[0] -= (dest[0] >> 2);
   dest[1] = srca[1] - srcb[1];
-  dest[1] -= (dsdiff >> 2);
+  dest[1] -= (dest[1] >> 2);
   dest[2] = srca[2] - srcb[2];
-  dest[2] -= (dsdiff >> 2);
+  dest[2] -= (dest[2] >> 2);
   dest[3] = srca[3] - srcb[3];
-  dest[3] -= (dsdiff >> 2);
+  dest[3] -= (dest[3] >> 2);
   dest[4] = srca[4] - srcb[4];
-  dest[4] -= (dsdiff >> 2);
+  dest[4] -= (dest[4] >> 2);
   dest[5] = srca[5] - srcb[5];
-  dest[5] -= (dsdiff >> 2);
+  dest[5] -= (dest[5] >> 2);
   dest[6] = srca[6] - srcb[6];
-  dest[6] -= (dsdiff >> 2);
+  dest[6] -= (dest[6] >> 2);
   dest[7] = srca[7] - srcb[7];
-  dest[7] -= (dsdiff >> 2);
+  dest[7] -= (dest[7] >> 2);
 #endif
 }
 
@@ -223,6 +225,64 @@ FlipSigns(int32_t *dest, const int32_t *src, unsigned flip) {
     dest[6] = -src[6];
     dest[7] = -src[7];
   }
+  else
+    memcpy(dest, src, sizeof(src) * 8);
+#endif
+}
+
+/* ============================================================================
+ *  LoadEWPrimData: Loads data for edgewalker_for_prims().
+ * ========================================================================= */
+void
+LoadEWPrimData(int32_t *dest1, int32_t *dest2, const int32_t *src) {
+#ifdef USE_SSE
+  __m128i ewShuffleKey;
+  __m128i ewData1, ewData2;
+  __m128i ewDataLo, ewDataHi;
+
+  static const uint8_t ewShuffleData[16] align(16) = {
+    0xA,0xB,0x2,0x3,
+    0x8,0x9,0x0,0x1,
+    0xE,0xF,0x6,0x7,
+    0xC,0xD,0x4,0x5,
+  };
+
+  ewShuffleKey = _mm_load_si128((__m128i*) (ewShuffleData));
+
+  /* Build the ewvars and ewdxvars arrays. */
+  ewData1 = _mm_load_si128((__m128i*) (src + 0));
+  ewData2 = _mm_load_si128((__m128i*) (src + 4));
+  ewDataLo = _mm_unpacklo_epi64(ewData1, ewData2);
+  ewDataHi = _mm_unpackhi_epi64(ewData1, ewData2);
+  ewDataLo = _mm_shuffle_epi8(ewDataLo, ewShuffleKey);
+  ewDataHi = _mm_shuffle_epi8(ewDataHi, ewShuffleKey);
+  _mm_store_si128((__m128i*) (dest1 + 0), ewDataLo);
+  _mm_store_si128((__m128i*) (dest2 + 0), ewDataHi);
+
+  ewData1 = _mm_load_si128((__m128i*) (src + 16));
+  ewData2 = _mm_load_si128((__m128i*) (src + 20));
+  ewDataLo = _mm_unpacklo_epi64(ewData1, ewData2);
+  ewDataHi = _mm_unpackhi_epi64(ewData1, ewData2);
+  ewDataLo = _mm_shuffle_epi8(ewDataLo, ewShuffleKey);
+  ewDataHi = _mm_shuffle_epi8(ewDataHi, ewShuffleKey);
+  _mm_store_si128((__m128i*) (dest1 + 4), ewDataLo);
+  _mm_store_si128((__m128i*) (dest2 + 4), ewDataHi);
+#else
+  dest1[0] = (src[0] & 0xffff0000) | ((src[4] >> 16) & 0x0000ffff);
+  dest1[1] = ((src[0] << 16) & 0xffff0000) | (src[4] & 0x0000ffff);
+  dest1[2] = (src[1] & 0xffff0000) | ((src[5] >> 16) & 0x0000ffff);
+  dest1[3] = ((src[1] << 16) & 0xffff0000) | (src[5] & 0x0000ffff);
+  dest1[4] = (src[16] & 0xffff0000) | ((src[20] >> 16) & 0x0000ffff);
+  dest1[5] = ((src[16] << 16) & 0xffff0000)  | (src[20] & 0x0000ffff);
+  dest1[6] = (src[17] & 0xffff0000) | ((src[21] >> 16) & 0x0000ffff);
+
+  dest2[0] = (src[2] & 0xffff0000) | ((src[6] >> 16) & 0x0000ffff);
+  dest2[1] = ((src[2] << 16) & 0xffff0000) | (src[6] & 0x0000ffff);
+  dest2[2] = (src[3] & 0xffff0000) | ((src[7] >> 16) & 0x0000ffff);
+  dest2[3] = ((src[3] << 16) & 0xffff0000) | (src[7] & 0x0000ffff);
+  dest2[4] = (src[18] & 0xffff0000) | ((src[22] >> 16) & 0x0000ffff);
+  dest2[5] = ((src[18] << 16) & 0xffff0000)  | (src[22] & 0x0000ffff);
+  dest2[6] = (src[19] & 0xffff0000) | ((src[23] >> 16) & 0x0000ffff);
 #endif
 }
 

@@ -20,6 +20,7 @@ void ClearLow5(int32_t *dest, const int32_t *src);
 void ClearLow9(int32_t *dest, const int32_t *src);
 void DiffASR2(int32_t *dest, const int32_t *srca, const int32_t *srcb);
 void FlipSigns(int32_t *dest, const int32_t *src, unsigned flip);
+void LoadEWPrimData(int32_t *dest1, int32_t *dest2, const int32_t *src);
 
 #endif
 
