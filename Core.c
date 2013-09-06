@@ -1,3 +1,15 @@
+/* ============================================================================
+ *  Core.c: Core RDP logic.
+ *
+ *  Original author: `MooglyGuy`. Many thanks to: Ville Linde, `angrylion`,
+ *  Shoutouts to: `olivieryuyu`, `marshallh`, `LaC`, `oman`, `pinchy`, `ziggy`,
+ *  `FatCat` and other folks I forgot.
+ *
+ *  Vectorization by Tyler J. Stachecki.
+ *
+ *  This file is subject to the terms and conditions defined in
+ *  file 'MAMELICENSE', which is part of this source code package.
+ * ========================================================================= */
 #include "Common.h"
 #include "Core.h"
 #include "CPU.h"
