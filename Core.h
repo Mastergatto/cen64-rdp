@@ -10,9 +10,9 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'MAMELICENSE', which is part of this source code package.
  * ========================================================================= */
-#include "Common.h"
 #ifndef __RDP__CORE__
 #define __RDP__CORE__
+#include "Common.h"
 
 #define SP_STATUS_HALT                  0x0001
 #define SP_STATUS_BROKE                 0x0002
@@ -69,6 +69,81 @@
 struct RDP;
 void RDPProcessList(struct RDP *);
 int rdp_init();
+
+typedef struct {
+  int stalederivs;
+  int dolod;
+  int partialreject_1cycle; 
+  int partialreject_2cycle;
+  int special_bsel0; 
+  int special_bsel1;
+  int rgb_alpha_dither;
+} MODEDERIVS;
+
+typedef struct {
+  int cycle_type;
+  int persp_tex_en;
+  int detail_tex_en;
+  int sharpen_tex_en;
+  int tex_lod_en;
+  int en_tlut;
+  int tlut_type;
+  int sample_type;
+  int mid_texel;
+  int bi_lerp0;
+  int bi_lerp1;
+  int convert_one;
+  int key_en;
+  int rgb_dither_sel;
+  int alpha_dither_sel;
+  int blend_m1a_0;
+  int blend_m1a_1;
+  int blend_m1b_0;
+  int blend_m1b_1;
+  int blend_m2a_0;
+  int blend_m2a_1;
+  int blend_m2b_0;
+  int blend_m2b_1;
+  int force_blend;
+  int alpha_cvg_select;
+  int cvg_times_alpha;
+  int z_mode;
+  int cvg_dest;
+  int color_on_cvg;
+  int image_read_en;
+  int z_update_en;
+  int z_compare_en;
+  int antialias_en;
+  int z_source_sel;
+  int dither_alpha_en;
+  int alpha_compare_en;
+  MODEDERIVS f;
+} OTHER_MODES;
+
+typedef struct {
+  int lx, rx;
+  int unscrx;
+  int validline;
+  int32_t r, g, b, a, s, t, w, z;
+  int32_t majorx[4];
+  int32_t minorx[4];
+  int32_t invalyscan[4];
+} SPAN;
+
+typedef struct {
+  int startspan;
+  int endspan;
+  int preendspan;
+  int nextspan;
+  int midspan;
+  int longspan;
+} SPANSIGS;
+
+extern uint32_t max_level;
+extern OTHER_MODES other_modes;
+extern SPAN span[1024];
+
+extern void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*);
 
 #endif
 

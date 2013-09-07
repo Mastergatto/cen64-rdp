@@ -19,7 +19,7 @@
 #endif
 
 #ifdef USE_SSE
-#include <tmmintrin.h>
+#include <smmintrin.h>
 #endif
 
 /* ============================================================================
@@ -283,6 +283,45 @@ LoadEWPrimData(int32_t *dest1, int32_t *dest2, const int32_t *src) {
   dest2[4] = (src[18] & 0xffff0000) | ((src[22] >> 16) & 0x0000ffff);
   dest2[5] = ((src[18] << 16) & 0xffff0000)  | (src[22] & 0x0000ffff);
   dest2[6] = (src[19] & 0xffff0000) | ((src[23] >> 16) & 0x0000ffff);
+#endif
+}
+
+/* ============================================================================
+ *  MulConstant: Multiplies a vector by a constant value.
+ * ========================================================================= */
+void
+MulConstant(int32_t *dest, int32_t *src, int32_t constant) {
+#ifdef USE_SSE
+  __m128i constantVector;
+  __m128i shuffleKey;
+  __m128i src1, src2;
+
+  static const uint8_t ShuffleData[16] align(16) = {
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+  };
+
+  constantVector = _mm_load_si128((__m128i*) &constant);
+  shuffleKey = _mm_load_si128((__m128i*) ShuffleData);
+  constantVector = _mm_shuffle_epi8(constantVector, shuffleKey);
+
+  src1 = _mm_load_si128((__m128i*) (src + 0));
+  src2 = _mm_load_si128((__m128i*) (src + 4));
+  src1 = _mm_mullo_epi32(src1, constantVector);
+  src2 = _mm_mullo_epi32(src2, constantVector);
+  _mm_store_si128((__m128i*) (dest + 0), src1);
+  _mm_store_si128((__m128i*) (dest + 4), src2);
+#else
+  dest[0] = src[0] * constant;
+  dest[1] = src[1] * constant;
+  dest[2] = src[2] * constant;
+  dest[3] = src[3] * constant;
+  dest[4] = src[4] * constant;
+  dest[5] = src[5] * constant;
+  dest[6] = src[6] * constant;
+  dest[7] = src[7] * constant;
 #endif
 }
 

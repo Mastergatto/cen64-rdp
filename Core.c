@@ -18,6 +18,7 @@
 #include "Helpers.h"
 #include "NormalROM.h"
 #include "Registers.h"
+#include "TCLod.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -95,18 +96,7 @@ uint16_t* rdram_16;
 uint32_t brightness = 0;
 int32_t iseed = 1;
 
-typedef struct
-{
-  int lx, rx;
-  int unscrx;
-  int validline;
-  int32_t r, g, b, a, s, t, w, z;
-  int32_t majorx[4];
-  int32_t minorx[4];
-  int32_t invalyscan[4];
-} SPAN;
-
-static SPAN span[1024];
+SPAN span[1024];
 uint32_t cvgbuf[1024];
 
 enum SpanType {
@@ -203,58 +193,6 @@ typedef struct
   int mul_a1;
   int add_a1;
 } COMBINE_MODES;
-
-typedef struct 
-{
-  int stalederivs;
-  int dolod;
-  int partialreject_1cycle; 
-  int partialreject_2cycle;
-  int special_bsel0; 
-  int special_bsel1;
-  int rgb_alpha_dither;
-} MODEDERIVS;
-
-typedef struct
-{
-  int cycle_type;
-  int persp_tex_en;
-  int detail_tex_en;
-  int sharpen_tex_en;
-  int tex_lod_en;
-  int en_tlut;
-  int tlut_type;
-  int sample_type;
-  int mid_texel;
-  int bi_lerp0;
-  int bi_lerp1;
-  int convert_one;
-  int key_en;
-  int rgb_dither_sel;
-  int alpha_dither_sel;
-  int blend_m1a_0;
-  int blend_m1a_1;
-  int blend_m1b_0;
-  int blend_m1b_1;
-  int blend_m2a_0;
-  int blend_m2a_1;
-  int blend_m2b_0;
-  int blend_m2b_1;
-  int force_blend;
-  int alpha_cvg_select;
-  int cvg_times_alpha;
-  int z_mode;
-  int cvg_dest;
-  int color_on_cvg;
-  int image_read_en;
-  int z_update_en;
-  int z_compare_en;
-  int antialias_en;
-  int z_source_sel;
-  int dither_alpha_en;
-  int alpha_compare_en;
-  MODEDERIVS f;
-} OTHER_MODES;
 
 
 
@@ -398,15 +336,6 @@ uint8_t TMEM[0x1000];
 
 #define PIXELS_TO_BYTES(pix, siz) (((pix) << (siz)) >> 1)
 
-typedef struct{
-  int startspan;
-  int endspan;
-  int preendspan;
-  int nextspan;
-  int midspan;
-  int longspan;
-}SPANSIGS;
-
 
 static void rdp_set_other_modes(uint32_t w1, uint32_t w2);
 static void fetch_texel(COLOR *color, int s, int t, uint32_t tilenum);
@@ -493,17 +422,15 @@ static void clearscreen(uint32_t x0,uint32_t y0, uint32_t x1, uint32_t y1, uint3
 static void clearfb16(uint16_t* fb, uint32_t width,uint32_t height);
 static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
-static void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod);
-static void tclod_tcclamp(int32_t* sss, int32_t* sst);
-static void lodfrac_lodtile_signals(int lodclamp, int32_t lod, uint32_t* l_tile, uint32_t* magnify, uint32_t* distant);
-static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs);
-static void tclod_1cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs);
 static void tclod_1cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs, int32_t* prelodfrac);
 static void tclod_2cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2);
 static void tclod_2cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2);
 static void tclod_2cycle_current_notexel1(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1);
 static void tclod_2cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2, int32_t* prelodfrac);
 static void tclod_copy(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1);
+void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod);
+static void tclod_tcclamp(int32_t* sss, int32_t* sst);
+static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs);
 static void get_texel1_1cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, SPANSIGS* sigs);
 static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc);
 static void video_max_optimized(uint32_t* Pixels, uint32_t* pen);
@@ -4185,7 +4112,10 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
 
   int i, j;
 
-  int32_t dincs[8];
+  static int32_t accum[8] align(16);
+  static int32_t localspan[8] align(16);
+  static int32_t slocalspan[8] align(16);
+  static int32_t dincs[8] align(16);
   int32_t xinc;
 
   FlipSigns(dincs, spans, flip);
@@ -4203,114 +4133,97 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
   int dzpixenc = dz_compress(dzpix);
 
   int cdith = 7, adith = 0;
-  int r, g, b, a, z, s, t, w;
-  int sr, sg, sb, sa, sz, ss, st, sw;
   int xstart, xend, xendsc;
   int sss = 0, sst = 0;
   int curpixel = 0;
   int x, length, scdiff;
   uint32_t fir, fig, fib;
           
-  for (i = start; i <= end; i++)
-  {
-    if (span[i].validline)
-    {
+  for (i = start; i <= end; i++) {
+    if (!span[i].validline)
+      continue;
 
-    xstart = span[i].lx;
-    xend = span[i].unscrx;
-    xendsc = span[i].rx;
-    r = span[i].r;
-    g = span[i].g;
-    b = span[i].b;
-    a = span[i].a;
-    z = other_modes.z_source_sel ? primitive_z : span[i].z;
-    s = span[i].s;
-    t = span[i].t;
-    w = span[i].w;
+  xstart = span[i].lx;
+  xend = span[i].unscrx;
+  xendsc = span[i].rx;
 
-    x = xendsc;
-    curpixel = fb_width * i + x;
-    zbcur = zb + curpixel;
+  memcpy(localspan, &span[i].r, sizeof(localspan));
+  localspan[SPAN_DZ] = other_modes.z_source_sel ? primitive_z : span[i].z;
 
-    if (!flip)
-    {
-      length = xendsc - xstart;
-      scdiff = xend - xendsc;
-      compute_cvg_noflip(i);
-    }
-    else
-    {
-      length = xstart - xendsc;
-      scdiff = xendsc - xend;
-      compute_cvg_flip(i);
-    }
+  x = xendsc;
+  curpixel = fb_width * i + x;
+  zbcur = zb + curpixel;
 
-    sigs.longspan = (length > 7);
-    sigs.midspan = (length == 7);
+  if (!flip) {
+    length = xendsc - xstart;
+    scdiff = xend - xendsc;
+    compute_cvg_noflip(i);
+  }
 
-    if (scdiff)
-    {
-      r += (dincs[SPAN_DR] * scdiff);
-      g += (dincs[SPAN_DG] * scdiff);
-      b += (dincs[SPAN_DB] * scdiff);
-      a += (dincs[SPAN_DA] * scdiff);
-      z += (dincs[SPAN_DZ] * scdiff);
-      s += (dincs[SPAN_DS] * scdiff);
-      t += (dincs[SPAN_DT] * scdiff);
-      w += (dincs[SPAN_DW] * scdiff);
-    }
+  else {
+    length = xstart - xendsc;
+    scdiff = xendsc - xend;
+    compute_cvg_flip(i);
+  }
 
-    for (j = 0; j <= length; j++)
-    {
-      sr = r >> 14;
-      sg = g >> 14;
-      sb = b >> 14;
-      sa = a >> 14;
-      ss = s >> 16;
-      st = t >> 16;
-      sw = w >> 16;
-      sz = (z >> 10) & 0x3fffff;
+  sigs.longspan = (length > 7);
+  sigs.midspan = (length == 7);
+
+  MulConstant(accum, dincs, scdiff);
+  AddVectors(localspan, localspan, accum);
+
+    for (j = 0; j <= length; j++) {
+#ifdef USE_SSE
+      __m128i data1 = _mm_load_si128((__m128i*) (localspan + 0));
+      __m128i data2 = _mm_load_si128((__m128i*) (localspan + 4));
+      data1 = _mm_srai_epi32(data1, 14);
+      data2 = _mm_srai_epi32(data2, 16);
+      _mm_store_si128((__m128i*) (slocalspan + 0), data1);
+      _mm_store_si128((__m128i*) (slocalspan + 4), data2);
+      slocalspan[SPAN_DZ] = (localspan[SPAN_DZ] >> 10) & 0x3FFFFF;
+#else
+      slocalspan[SPAN_DR] = localspan[SPAN_DR] >> 14;
+      slocalspan[SPAN_DG] = localspan[SPAN_DG] >> 14;
+      slocalspan[SPAN_DB] = localspan[SPAN_DB] >> 14;
+      slocalspan[SPAN_DA] = localspan[SPAN_DA] >> 14;
+      slocalspan[SPAN_DS] = localspan[SPAN_DS] >> 16;
+      slocalspan[SPAN_DT] = localspan[SPAN_DT] >> 16;
+      slocalspan[SPAN_DW] = localspan[SPAN_DW] >> 16;
+      slocalspan[SPAN_DZ] = (localspan[SPAN_DZ] >> 10) & 0x3fffff;
+#endif
 
       sigs.endspan = (j == length);
       sigs.preendspan = (j == (length - 1));
 
       lookup_cvmask_derivatives(cvgbuf[x], &offx, &offy, &curpixel_cvg, &curpixel_cvbit);
 
-      tcdiv_ptr(ss, st, sw, &sss, &sst);
+      tcdiv_ptr(slocalspan[SPAN_DS], slocalspan[SPAN_DT], slocalspan[SPAN_DW], &sss, &sst);
 
-      tclod_1cycle_current_simple(&sss, &sst, s, t, w, dincs[SPAN_DS], dincs[SPAN_DT], dincs[SPAN_DW], i, prim_tile, &tile1, &sigs);
+      tclod_1cycle_current_simple(&sss, &sst, localspan + SPAN_DS, dincs + SPAN_DS, i, prim_tile, &tile1, &sigs);
 
       texture_pipeline_cycle(&texel0_color, &texel0_color, sss, sst, tile1, 0);
 
-      rgbaz_correct_clip(offx, offy, sr, sg, sb, sa, &sz, curpixel_cvg);
+      rgbaz_correct_clip(offx, offy, slocalspan[SPAN_DR], slocalspan[SPAN_DG], slocalspan[SPAN_DB], slocalspan[SPAN_DA], &slocalspan[SPAN_DZ], curpixel_cvg);
 
       get_dither_noise_ptr(x, i, &cdith, &adith);
       combiner_1cycle(adith, &curpixel_cvg);
         
       fbread1_ptr(curpixel, &curpixel_memcvg);
-      if (z_compare(zbcur, sz, dzpix, dzpixenc, &blend_en, &prewrap, &curpixel_cvg, curpixel_memcvg))
+      if (z_compare(zbcur, slocalspan[SPAN_DZ], dzpix, dzpixenc, &blend_en, &prewrap, &curpixel_cvg, curpixel_memcvg))
       {
         if (blender_1cycle(&fir, &fig, &fib, cdith, blend_en, prewrap, curpixel_cvg, curpixel_cvbit))
         {
           fbwrite_ptr(curpixel, fir, fig, fib, blend_en, curpixel_cvg, curpixel_memcvg);
           if (other_modes.z_update_en)
-            z_store(zbcur, sz, dzpixenc);
+            z_store(zbcur, slocalspan[SPAN_DZ], dzpixenc);
         }
       }
 
-      s += dincs[SPAN_DS];
-      t += dincs[SPAN_DT];
-      w += dincs[SPAN_DW];
-      r += dincs[SPAN_DR];
-      g += dincs[SPAN_DG];
-      b += dincs[SPAN_DB];
-      a += dincs[SPAN_DA];
-      z += dincs[SPAN_DZ];
+      AddVectors(localspan, localspan, dincs);
       
       x += xinc;
       curpixel += xinc;
       zbcur += xinc;
-    }
     }
   }
 }
@@ -4442,8 +4355,6 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
   uint32_t blend_en;
   uint32_t prewrap;
   uint32_t curpixel_cvg, curpixel_cvbit, curpixel_memcvg;
-
-  
   
   int tile2 = (tilenum + 1) & 7;
   int tile1 = tilenum;
@@ -9384,15 +9295,6 @@ static void tclod_2cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, 
 
 static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs)
 {
-
-
-
-
-
-
-
-
-
   int fars, fart, farsw;
   int lodclamp = 0;
   int32_t lod = 0;
@@ -9454,83 +9356,6 @@ static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int3
 
       
       
-      if (!other_modes.detail_tex_en || magnify)
-        *t1 = (prim_tile + l_tile) & 7;
-      else
-        *t1 = (prim_tile + l_tile + 1) & 7;
-    }
-  }
-}
-
-
-
-static void tclod_1cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs)
-{
-  int fars, fart, farsw, nexts, nextt, nextsw;
-  int lodclamp = 0;
-  int32_t lod = 0;
-  uint32_t l_tile = 0, magnify = 0, distant = 0;
-  
-  tclod_tcclamp(sss, sst);
-
-  if (other_modes.f.dolod)
-  {
-
-    int nextscan = scanline + 1;
-    if (span[nextscan].validline)
-    {
-      if (!sigs->endspan || !sigs->longspan)
-      {
-        nextsw = (w + dwinc) >> 16;
-        nexts = (s + dsinc) >> 16;
-        nextt = (t + dtinc) >> 16;
-        
-        if (!(sigs->preendspan && sigs->longspan) && !(sigs->endspan && sigs->midspan))
-        {
-          farsw = (w + (dwinc << 1)) >> 16;
-          fars = (s + (dsinc << 1)) >> 16;
-          fart = (t + (dtinc << 1)) >> 16;
-        }
-        else
-        {
-          farsw = (w - dwinc) >> 16;
-          fars = (s - dsinc) >> 16;
-          fart = (t - dtinc) >> 16;
-        }
-      }
-      else
-      {
-        nextt = span[nextscan].t >> 16;
-        nexts = span[nextscan].s >> 16;
-        nextsw = span[nextscan].w >> 16;
-        fart = (span[nextscan].t + dtinc) >> 16; 
-        fars = (span[nextscan].s + dsinc) >> 16; 
-        farsw = (span[nextscan].w + dwinc) >> 16;
-      }
-    }
-    else
-    {
-      nextsw = (w + dwinc) >> 16;
-      nexts = (s + dsinc) >> 16;
-      nextt = (t + dtinc) >> 16;
-      farsw = (w + (dwinc << 1)) >> 16;
-      fars = (s + (dsinc << 1)) >> 16;
-      fart = (t + (dtinc << 1)) >> 16;
-    }
-
-    tcdiv_ptr(nexts, nextt, nextsw, &nexts, &nextt);
-    tcdiv_ptr(fars, fart, farsw, &fars, &fart);
-
-    lodclamp = (fart & 0x60000) || (nextt & 0x60000) || (fars & 0x60000) || (nexts & 0x60000);
-
-    tclod_4x17_to_15(nexts, fars, nextt, fart, 0, &lod);
-
-    lodfrac_lodtile_signals(lodclamp, lod, &l_tile, &magnify, &distant);
-  
-    if (other_modes.tex_lod_en)
-    {
-      if (distant)
-        l_tile = max_level;
       if (!other_modes.detail_tex_en || magnify)
         *t1 = (prim_tile + l_tile) & 7;
       else
@@ -9755,7 +9580,7 @@ static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t
 
 
 
-static void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod)
+void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod)
 {
 
 
@@ -9778,10 +9603,6 @@ static void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_
 static void tclod_tcclamp(int32_t* sss, int32_t* sst)
 {
   int32_t tempanded, temps = *sss, tempt = *sst;
-
-  
-  
-  
   
   if (!(temps & 0x40000))
   {
@@ -9824,11 +9645,10 @@ static void tclod_tcclamp(int32_t* sss, int32_t* sst)
   }
   else
     *sst = 0x7fff;
-
 }
 
 
-static void lodfrac_lodtile_signals(int lodclamp, int32_t lod, uint32_t* l_tile, uint32_t* magnify, uint32_t* distant)
+void lodfrac_lodtile_signals(int lodclamp, int32_t lod, uint32_t* l_tile, uint32_t* magnify, uint32_t* distant)
 {
   uint32_t ltil, dis, mag;
   int32_t lf;
