@@ -80,12 +80,8 @@ uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
 
 int blshifta = 0, blshiftb = 0, pastblshifta = 0, pastblshiftb = 0;
-uint32_t plim = 0x3fffff;
-uint32_t idxlim16 = 0x1fffff;
-uint32_t idxlim32 = 0xfffff;
 uint8_t* rdram_8;
 uint16_t* rdram_16;
-uint32_t brightness = 0;
 int32_t iseed = 1;
 
 SPAN span[1024];
@@ -102,7 +98,7 @@ enum SpanType {
   SPAN_DZ,
 };
 
-static int32_t spans[8];
+static int32_t spans[8] align(16);
 static int spans_dzpix;
 static int32_t ewdata[44] align(16);
 
@@ -411,7 +407,6 @@ static void get_dither_noise_complete(int x, int y, int* cdith, int* adith);
 static void get_dither_only(int x, int y, int* cdith, int* adith);
 static void get_dither_nothing(int x, int y, int* cdith, int* adith);
 static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, int* z, uint32_t curpixel_cvg);
-int IsBadPtrW32(void *ptr, uint32_t bytes);
 uint32_t vi_integer_sqrt(uint32_t a);
 void deduce_derivatives(void);
 static int32_t irand();
@@ -535,37 +530,26 @@ void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
 static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF); }
 static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
 
-#define RREADADDR8(in) (((in) <= plim) ? (rdram_8[(in)]) : 0)
-#define RREADIDX16(in) (((in) <= idxlim16) ? bswap16(rdram_16[(in)]) : 0)
-#define RREADIDX32(in) (((in) <= idxlim32) ? bswap32((rdram[(in)])) : 0)
- 
-#define RWRITEADDR8(in, val)  {if ((in) <= plim) rdram_8[(in)] = (val);}
-#define RWRITEIDX16(in, val)  {if ((in) <= idxlim16) rdram_16[(in)] = bswap16(val);}
-#define RWRITEIDX32(in, val)  {if ((in) <= idxlim32) rdram[(in)] = bswap32(val);}
- 
-#define HREADADDR8(in)      (((in) <= 0x3fffff) ? (hidden_bits[(in) ^ BYTE_ADDR_XOR]) : 0)
-#define HWRITEADDR8(in, val)  {if ((in) <= 0x3fffff) hidden_bits[(in) ^ BYTE_ADDR_XOR] = (val);}
+#define RREADADDR8(in) (assert(in <= 0x7FFFFF), rdram_8[in]);
+#define RREADIDX16(in) (assert(in <= 0x7FFFFE), bswap16(rdram_16[in]));
+#define RREADIDX32(in) (assert(in <= 0x7FFFFC), bswap32(rdram[in]));
 
-#define PAIRREAD16(rdst, hdst, in)    \
-{                   \
-  if ((in) <= idxlim16) {(rdst) = bswap16(rdram_16[(in)]); (hdst) = hidden_bits[(in)];}  \
-  else {(rdst) = (hdst) = 0;}     \
-}
+#define RWRITEADDR8(in,val) {assert(in <= 0x7FFFFF); rdram_8[in] = (val);}
+#define RWRITEIDX16(in,val) {assert(in <= 0x7FFFFE); rdram_16[in] = bswap16(val);}
+#define RWRITEIDX32(in,val) {assert(in <= 0x7FFFFC); rdram[in] = bswap32(val);}
 
-#define PAIRWRITE16(in, rval, hval)   \
-{                   \
-  if ((in) <= idxlim16) {rdram_16[(in)] = bswap16(rval); hidden_bits[(in)] = (hval);}  \
-}
+#define PAIRREAD16(rdst,hdst,in) {assert(in <= 0x7FFFFE); \
+  (rdst)=bswap16(rdram_16[in]); (hdst) = hidden_bits[in];}
 
-#define PAIRWRITE32(in, rval, hval0, hval1) \
-{                     \
-  if ((in) <= idxlim32) {rdram[(in)] = bswap32(rval); hidden_bits[(in) << 1] = (hval0); hidden_bits[((in) << 1) + 1] = (hval1);} \
-}
+#define PAIRWRITE16(in,rval,hval) {assert(in <= 0x7FFFFE); \
+  rdram_16[in]=bswap16(rval); hidden_bits[in]=(hval);}
 
-#define PAIRWRITE8(in, rval, hval)  \
-{                 \
-  if ((in) <= plim) {rdram_8[(in)] = (rval); if ((in) & 1) hidden_bits[(in) >> 1] = (hval);}  \
-}
+#define PAIRWRITE32(in,rval,hval0,hval1) {assert(in <= 0x7FFFFC); \
+  rdram[in]=bswap32(rval); hidden_bits[(in)<<1]=(hval0); \
+  hidden_bits[((in)<<1)+1]=(hval1); }
+
+#define PAIRWRITE8(in,rval,hval) {assert(in <= 0x7FFFFF); \
+  rdram_8[in]=(rval); if ((in) & 1) hidden_bits[(in)>>1]=(hval);}
 
 struct onetime
 {
@@ -908,26 +892,6 @@ int rdp_init()
 
   precalculate_everything();
 
-#ifdef WIN32
-  if (IsBadPtrW32(&rdram[0x7f0000 >> 2],16))
-  {
-    plim = 0x3fffff;
-    idxlim16 = 0x1fffff;
-    idxlim32 = 0xfffff;
-  }
-  else
-  {
-    plim = 0x7fffff;
-    idxlim16 = 0x3fffff;
-    idxlim32 = 0x1fffff;
-  }
-#else
-  plim = 0x3fffff;
-  idxlim16 = 0x1fffff;
-  idxlim32 = 0xfffff;
-#endif
-
-  
   rdram_8 = (uint8_t*)rdram;
   rdram_16 = (uint16_t*)rdram;
   return 0;
@@ -3555,7 +3519,6 @@ static void texture_pipeline_cycle(COLOR* TEX, COLOR* prev, int32_t SSS, int32_t
 {
 #define TRELATIVE(x, y)   ((x) - ((y) << 3));
 #define UPPER ((sfrac + tfrac) & 0x20)
-
   int32_t maxs, maxt, invt0r, invt0g, invt0b, invt0a;
   int32_t sfrac, tfrac, invsf, invtf;
   int bilerp = cycle ? other_modes.bi_lerp1 : other_modes.bi_lerp0;
@@ -7829,29 +7792,6 @@ static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, i
 
   zanded = (sz & 0x00060000) >> 17;
   *z = (sz & zandtable[zanded]) | zortable[zanded];
-}
-
-int IsBadPtrW32(void *ptr, uint32_t bytes)
-{
-#ifdef WIN32
-  SIZE_T dwSize;
-    MEMORY_BASIC_INFORMATION meminfo;
-    if (!ptr)
-        return 1;
-    memset(&meminfo, 0x00, sizeof(meminfo));
-    dwSize = VirtualQuery(ptr, &meminfo, sizeof(meminfo));
-    if (!dwSize)
-        return 1;
-    if (MEM_COMMIT != meminfo.State)
-        return 1;
-    if (!(meminfo.Protect & (PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)))
-        return 1;
-    if (bytes > meminfo.RegionSize)
-        return 1;
-    if ((uint64_t)((char*)ptr - (char*)meminfo.BaseAddress) > (uint64_t)(meminfo.RegionSize - bytes))
-        return 1;
-#endif
-    return 0;
 }
 
 uint32_t vi_integer_sqrt(uint32_t a)
