@@ -16,51 +16,29 @@
 
 #include <smmintrin.h>
 
-static void tclod_tcclamp_opt(int32_t* sss, int32_t* sst)
-{
-  int32_t tempanded, temps = *sss, tempt = *sst;
-  
-  if (!(temps & 0x40000))
-  {
-    if (!(temps & 0x20000))
-    {
-      tempanded = temps & 0x18000;
-      if (tempanded != 0x8000)
-      {
-        if (tempanded != 0x10000)
-          *sss &= 0xffff;
-        else
-          *sss = 0x8000;
-      }
-      else
-        *sss = 0x7fff;
-    }
-    else
-      *sss = 0x8000;
-  }
-  else
-    *sss = 0x7fff;
+int32_t tclod_tcclamp(int32_t x) {
+  static const uint32_t LUT2[4] align(16) = {
+    0x0000, 0x7FFF, 0x8000, 0x0000,
+  };
 
-  if (!(tempt & 0x40000))
-  {
-    if (!(tempt & 0x20000))
-    {
-      tempanded = tempt & 0x18000;
-      if (tempanded != 0x8000)
-      {
-        if (tempanded != 0x10000)
-          *sst &= 0xffff;
-        else
-          *sst = 0x8000;
-      }
-      else
-        *sst = 0x7fff;
-    }
-    else
-      *sst = 0x8000;
-  }
-  else
-    *sst = 0x7fff;
+  static const uint32_t LUT[16] align(64) = {
+    0x1FFFF, 0x8000, 0x10000,0x4FFFF,
+    0x8000, 0x8000, 0x8000, 0x8000,
+    0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF,
+    0x7FFF, 0x7FFF, 0X7FFF, 0x7FFF,
+  };
+
+  unsigned idx = (x >> 15) & 0xF;
+  uint32_t value = LUT[idx];
+  uint32_t temp;
+
+  if ((x >> 17) & 0x3)
+    return value;
+
+  else if ((temp = (x & value)) != value)
+    return temp;
+
+  return LUT2[idx];
 }
 
 void tclod_1cycle_current_simple(int32_t* sss, int32_t* sst,
@@ -83,7 +61,8 @@ void tclod_1cycle_current_simple(int32_t* sss, int32_t* sst,
 
   stw = _mm_load_si128((__m128i*) spanptr);
   dincstw = _mm_load_si128((__m128i*) dincs);
-  tclod_tcclamp_opt(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (!other_modes.f.dolod)
     return;

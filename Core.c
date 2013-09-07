@@ -429,7 +429,6 @@ static void tclod_2cycle_current_notexel1(int32_t* sss, int32_t* sst, int32_t s,
 static void tclod_2cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2, int32_t* prelodfrac);
 static void tclod_copy(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1);
 void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod);
-static void tclod_tcclamp(int32_t* sss, int32_t* sst);
 static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs);
 static void get_texel1_1cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, SPANSIGS* sigs);
 static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc);
@@ -9049,7 +9048,8 @@ static void tclod_2cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int3
   uint32_t distant = 0;
   int inits = *sss, initt = *sst;
 
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9115,7 +9115,8 @@ static void tclod_2cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, i
   uint32_t distant = 0;
   int inits = *sss, initt = *sst;
 
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9175,7 +9176,8 @@ static void tclod_2cycle_current_notexel1(int32_t* sss, int32_t* sst, int32_t s,
   uint32_t distant = 0;
   int inits = *sss, initt = *sst;
 
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9219,7 +9221,8 @@ static void tclod_2cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, 
   uint32_t distant = 0;
   int inits = *sss, initt = *sst;
 
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9300,7 +9303,8 @@ static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int3
   int32_t lod = 0;
   uint32_t l_tile = 0, magnify = 0, distant = 0;
   
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9371,7 +9375,8 @@ static void tclod_1cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, 
   int32_t lod = 0;
   uint32_t l_tile = 0, magnify = 0, distant = 0;
   
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.f.dolod)
   {
@@ -9504,7 +9509,8 @@ static void tclod_copy(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t
   int32_t lod = 0;
   uint32_t l_tile = 0, magnify = 0, distant = 0;
 
-  tclod_tcclamp(sss, sst);
+  *sss = tclod_tcclamp(*sss);
+  *sst = tclod_tcclamp(*sst);
 
   if (other_modes.tex_lod_en)
   {
@@ -9599,54 +9605,6 @@ void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext
   if (dels & 0x1c000)
     *lod |= 0x4000;
 }
-
-static void tclod_tcclamp(int32_t* sss, int32_t* sst)
-{
-  int32_t tempanded, temps = *sss, tempt = *sst;
-  
-  if (!(temps & 0x40000))
-  {
-    if (!(temps & 0x20000))
-    {
-      tempanded = temps & 0x18000;
-      if (tempanded != 0x8000)
-      {
-        if (tempanded != 0x10000)
-          *sss &= 0xffff;
-        else
-          *sss = 0x8000;
-      }
-      else
-        *sss = 0x7fff;
-    }
-    else
-      *sss = 0x8000;
-  }
-  else
-    *sss = 0x7fff;
-
-  if (!(tempt & 0x40000))
-  {
-    if (!(tempt & 0x20000))
-    {
-      tempanded = tempt & 0x18000;
-      if (tempanded != 0x8000)
-      {
-        if (tempanded != 0x10000)
-          *sst &= 0xffff;
-        else
-          *sst = 0x8000;
-      }
-      else
-        *sst = 0x7fff;
-    }
-    else
-      *sst = 0x8000;
-  }
-  else
-    *sst = 0x7fff;
-}
-
 
 void lodfrac_lodtile_signals(int lodclamp, int32_t lod, uint32_t* l_tile, uint32_t* magnify, uint32_t* distant)
 {

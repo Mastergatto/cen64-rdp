@@ -15,6 +15,8 @@
 #include "Common.h"
 #include "Core.h"
 
+int32_t tclod_tcclamp(int32_t x);
+
 void tclod_4x17_to_15(int32_t scurr, int32_t snext,
   int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod);
 
