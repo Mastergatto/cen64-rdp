@@ -16,8 +16,8 @@
 #include "Definitions.h"
 #include "Externs.h"
 #include "Helpers.h"
-#include "NormalROM.h"
 #include "Registers.h"
+#include "Tables.h"
 #include "TCLod.h"
 
 #include <assert.h>
@@ -348,7 +348,6 @@ static void tcclamp_cycle(int32_t* S, int32_t* T, int32_t* SFRAC, int32_t* TFRAC
 static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t maxt, int32_t num);
 static void tcshift_cycle(int32_t* S, int32_t* T, int32_t* maxs, int32_t* maxt, uint32_t num);
 static void tcshift_copy(int32_t* S, int32_t* T, uint32_t num);
-static void precalculate_everything(void);
 static int alpha_compare(int32_t comb_alpha);
 static int32_t color_combiner_equation(int32_t a, int32_t b, int32_t c, int32_t d);
 static int32_t alpha_combiner_equation(int32_t a, int32_t b, int32_t c, int32_t d);
@@ -378,9 +377,6 @@ static void fbread2_32(uint32_t num, uint32_t* curpixel_memcvg);
 static uint32_t z_decompress(uint32_t rawz);
 static uint32_t dz_decompress(uint32_t compresseddz);
 static uint32_t dz_compress(uint32_t value);
-static void z_build_com_table(void);
-static void precalc_cvmask_derivatives(void);
-static uint16_t decompress_cvmask_frombyte(uint8_t byte);
 static void lookup_cvmask_derivatives(uint32_t mask, uint8_t* offx, uint8_t* offy, uint32_t* curpixel_cvg, uint32_t* curpixel_cvbit);
 static void z_store(uint32_t zcurpixel, uint32_t z, int dzpixenc);
 static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int dzpixenc, uint32_t* blend_en, uint32_t* prewrap, uint32_t* curpixel_cvg, uint32_t curpixel_memcvg);
@@ -416,16 +412,6 @@ static int32_t lod_frac = 0;
 uint32_t DebugMode = 0, DebugMode2 = 0;
 int debugcolor = 0;
 uint8_t hidden_bits[0x400000];
-struct {uint32_t shift; uint32_t add;} z_dec_table[8] = {
-     {6, 0x00000},
-     {5, 0x20000},
-     {4, 0x30000},
-     {3, 0x38000},
-     {2, 0x3c000},
-     {1, 0x3e000},
-     {0, 0x3f000},
-     {0, 0x3f800},
-};
 
 static void (*fbread_func[4])(uint32_t, uint32_t*) = 
 {
@@ -481,30 +467,6 @@ void (*rgb_dither_ptr)(int*, int*, int*, int) = rgb_dither_complete;
 void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*) = tcdiv_nopersp;
 void (*render_spans_1cycle_ptr)(int, int, int, int) = render_spans_1cycle_complete;
 void (*render_spans_2cycle_ptr)(int, int, int, int) = render_spans_2cycle_notexel1;
-
-typedef struct{
-  uint8_t cvg;
-  uint8_t cvbit;
-  uint8_t xoff;
-  uint8_t yoff;
-}CVtcmaskDERIVATIVE;
-
-uint32_t gamma_table[0x100];
-uint32_t gamma_dither_table[0x4000];
-uint16_t z_com_table[0x40000];
-uint32_t z_complete_dec_table[0x4000];
-uint8_t replicated_rgba[32];
-int32_t vi_restore_table[0x400];
-int32_t maskbits_table[16];
-uint32_t special_9bit_clamptable[512];
-int32_t special_9bit_exttable[512];
-int32_t ge_two_table[128];
-int32_t log2table[256];
-int32_t tcdiv_table[0x8000];
-uint8_t bldiv_hwaccurate_table[0x8000];
-int32_t clamp_t_diff[8];
-int32_t clamp_s_diff[8];
-CVtcmaskDERIVATIVE cvarray[0x100];
 
 static uint32_t* rdram;
 static uint32_t* rsp_dmem;
@@ -890,8 +852,6 @@ int rdp_init()
   rdp_pipeline_crashed = 0;
   memset(&onetimewarnings, 0, sizeof(onetimewarnings));
 
-  precalculate_everything();
-
   rdram_8 = (uint8_t*)rdram;
   rdram_16 = (uint16_t*)rdram;
   return 0;
@@ -1263,170 +1223,6 @@ static void combiner_2cycle(int adseed, uint32_t* curpixel_cvg)
   shade_color.a += adseed;
   if (shade_color.a & 0x100)
     shade_color.a = 0xff;
-}
-
-static void precalculate_everything(void)
-{
-  int i = 0, k = 0;
-
-  
-  
-  for (i = 0; i < 256; i++)
-  {
-    gamma_table[i] = vi_integer_sqrt(i << 6);
-    gamma_table[i] <<= 1;
-  }
-  for (i = 0; i < 0x4000; i++)
-  {
-    gamma_dither_table[i] = vi_integer_sqrt(i);
-    gamma_dither_table[i] <<= 1;
-  }
-
-  
-  
-  
-  
-  z_build_com_table();
-
-  
-  
-  uint32_t exponent;
-  uint32_t mantissa;
-  for (i = 0; i < 0x4000; i++)
-  {
-    exponent = (i >> 11) & 7;
-    mantissa = i & 0x7ff;
-    z_complete_dec_table[i] = ((mantissa << z_dec_table[exponent].shift) + z_dec_table[exponent].add) & 0x3ffff;
-  }
-
-  
-  
-  precalc_cvmask_derivatives();
-
-  
-  
-  i = 0;
-  log2table[0] = log2table[1] = 0;
-  for (i = 2; i < 256; i++)
-  {
-    for (k = 7; k > 0; k--)
-    {
-      if((i >> k) & 1)
-      {
-        log2table[i] = k;
-        break;
-      }
-    }
-  }
-
-  
-  
-  
-  for (i = 0; i < 0x400; i++)
-  {
-    if (((i >> 5) & 0x1f) > (i & 0x1f))
-      vi_restore_table[i] = 1;
-    else if (((i >> 5) & 0x1f) < (i & 0x1f))
-      vi_restore_table[i] = -1;
-    else
-      vi_restore_table[i] = 0;
-  }
-
-  
-  
-  for (i = 0; i < 32; i++)
-    replicated_rgba[i] = (i << 3) | ((i >> 2) & 7); 
-
-  
-  
-  maskbits_table[0] = 0x3ff;
-  for (i = 1; i < 16; i++)
-    maskbits_table[i] = ((uint16_t)(0xffff) >> (16 - i)) & 0x3ff;
-  
-
-  
-  
-  for(i = 0; i < 0x200; i++)
-  {
-    switch((i >> 7) & 3)
-    {
-    case 0:
-    case 1:
-      special_9bit_clamptable[i] = i & 0xff;
-      break;
-    case 2:
-      special_9bit_clamptable[i] = 0xff;
-      break;
-    case 3:
-      special_9bit_clamptable[i] = 0;
-      break;
-    }
-  }
-
-  
-  
-  for(i = 0; i < 0x200; i++)
-  {
-    special_9bit_exttable[i] = ((i & 0x180) == 0x180) ? (i | ~0x1ff) : (i & 0x1ff);
-  }
-
-  
-  
-  
-  
-  
-  
-  int temppoint, tempslope; 
-  int normout;
-  int wnorm;
-  int shift, tlu_rcp;
-
-  for (i = 0; i < 0x8000; i++)
-  {
-    for (k = 1; k <= 14 && !((i << k) & 0x8000); k++) 
-      ;
-    shift = k - 1;
-    normout = (i << shift) & 0x3fff;
-    wnorm = (normout & 0xff) << 2;
-    normout >>= 8;
-
-    temppoint = NormalPointLUT[normout];
-    tempslope = NormalSlopeLUT[normout];
-
-    tempslope = (tempslope | ~0x3ff) + 1;
-    
-    tlu_rcp = (((tempslope * wnorm) >> 10) + temppoint) & 0x7fff;
-    
-    tcdiv_table[i] = shift | (tlu_rcp << 4);
-  }
-
-  
-  int d = 0, n = 0, temp = 0, res = 0, invd = 0, nbit = 0;
-  int ps[9];
-
-  for (i = 0; i < 0x8000; i++)
-  {
-    res = 0;
-    d = (i >> 11) & 0xf;
-    n = i & 0x7ff;
-    invd = (~d) & 0xf;
-    
-
-    temp = invd + (n >> 8) + 1;
-    ps[0] = temp & 7;
-    for (k = 0; k < 8; k++)
-    {
-      nbit = (n >> (7 - k)) & 1;
-      if (res & (0x100 >> k))
-        temp = invd + (ps[k] << 1) + nbit + 1;
-      else
-        temp = d + (ps[k] << 1) + nbit;
-      ps[k + 1] = temp & 7;
-      if (temp & 0x10)
-        res |= (1 << (7 - k));
-    }
-    bldiv_hwaccurate_table[i] = res;
-  }
 }
 
 static void SET_BLENDER_INPUT(int cycle, int which, int32_t **input_r, int32_t **input_g, int32_t **input_b, int32_t **input_a, int a, int b)
@@ -7073,209 +6869,6 @@ static void fbread2_32(uint32_t curpixel, uint32_t* curpixel_memcvg)
 static uint32_t z_decompress(uint32_t zb)
 {
   return z_complete_dec_table[(zb >> 2) & 0x3fff];
-}
-
-static void z_build_com_table(void)
-{
-
-  uint16_t altmem = 0;
-  for(int z = 0; z < 0x40000; z++)
-  {
-  switch((z >> 11) & 0x7f)
-  {
-  case 0x00:
-  case 0x01:
-  case 0x02:
-  case 0x03:
-  case 0x04:
-  case 0x05:
-  case 0x06:
-  case 0x07:
-  case 0x08:
-  case 0x09:
-  case 0x0a:
-  case 0x0b:
-  case 0x0c:
-  case 0x0d:
-  case 0x0e:
-  case 0x0f:
-  case 0x10:
-  case 0x11:
-  case 0x12:
-  case 0x13:
-  case 0x14:
-  case 0x15:
-  case 0x16:
-  case 0x17:
-  case 0x18:
-  case 0x19:
-  case 0x1a:
-  case 0x1b:
-  case 0x1c:
-  case 0x1d:
-  case 0x1e:
-  case 0x1f:
-  case 0x20:
-  case 0x21:
-  case 0x22:
-  case 0x23:
-  case 0x24:
-  case 0x25:
-  case 0x26:
-  case 0x27:
-  case 0x28:
-  case 0x29:
-  case 0x2a:
-  case 0x2b:
-  case 0x2c:
-  case 0x2d:
-  case 0x2e:
-  case 0x2f:
-  case 0x30:
-  case 0x31:
-  case 0x32:
-  case 0x33:
-  case 0x34:
-  case 0x35:
-  case 0x36:
-  case 0x37:
-  case 0x38:
-  case 0x39:
-  case 0x3a:
-  case 0x3b:
-  case 0x3c:
-  case 0x3d:
-  case 0x3e:
-  case 0x3f:
-    altmem = (z >> 4) & 0x1ffc;
-    break;
-  case 0x40:
-  case 0x41:
-  case 0x42:
-  case 0x43:
-  case 0x44:
-  case 0x45:
-  case 0x46:
-  case 0x47:
-  case 0x48:
-  case 0x49:
-  case 0x4a:
-  case 0x4b:
-  case 0x4c:
-  case 0x4d:
-  case 0x4e:
-  case 0x4f:
-  case 0x50:
-  case 0x51:
-  case 0x52:
-  case 0x53:
-  case 0x54:
-  case 0x55:
-  case 0x56:
-  case 0x57:
-  case 0x58:
-  case 0x59:
-  case 0x5a:
-  case 0x5b:
-  case 0x5c:
-  case 0x5d:
-  case 0x5e:
-  case 0x5f:
-    altmem = ((z >> 3) & 0x1ffc) | 0x2000;
-    break;
-  case 0x60:
-  case 0x61:
-  case 0x62:
-  case 0x63:
-  case 0x64:
-  case 0x65:
-  case 0x66:
-  case 0x67:
-  case 0x68:
-  case 0x69:
-  case 0x6a:
-  case 0x6b:
-  case 0x6c:
-  case 0x6d:
-  case 0x6e:
-  case 0x6f:
-    altmem = ((z >> 2) & 0x1ffc) | 0x4000;
-    break;
-  case 0x70:
-  case 0x71:
-  case 0x72:
-  case 0x73:
-  case 0x74:
-  case 0x75:
-  case 0x76:
-  case 0x77:
-    altmem = ((z >> 1) & 0x1ffc) | 0x6000;
-    break;
-  case 0x78:
-  case 0x79:
-  case 0x7a:
-  case 0x7b:
-    altmem = (z & 0x1ffc) | 0x8000;
-    break;
-  case 0x7c:
-  case 0x7d:
-    altmem = ((z << 1) & 0x1ffc) | 0xa000;
-    break;
-  case 0x7e:
-    altmem = ((z << 2) & 0x1ffc) | 0xc000;
-    break;
-  case 0x7f:
-    altmem = ((z << 2) & 0x1ffc) | 0xe000;
-    break;
-  default:
-    fatalerror("z_build_com_table failed");
-    break;
-  }
-
-    z_com_table[z] = altmem;
-
-    }
-}
-
-static void precalc_cvmask_derivatives(void)
-{
-  int i = 0, k = 0;
-  uint16_t mask = 0, maskx = 0, masky = 0;
-  uint8_t offx = 0, offy = 0;
-  const uint8_t yarray[16] = {0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0};
-  const uint8_t xarray[16] = {0, 3, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
-
-  
-  for (; i < 0x100; i++)
-  {
-    mask = decompress_cvmask_frombyte(i);
-    cvarray[i].cvg = cvarray[i].cvbit = 0;
-    cvarray[i].cvbit = (i >> 7) & 1;
-    for (k = 0; k < 8; k++)
-      cvarray[i].cvg += ((i >> k) & 1);
-
-    
-    masky = maskx = offx = offy = 0;
-    for (k = 0; k < 4; k++)
-      masky |= ((mask & (0xf000 >> (k << 2))) > 0) << k;
-
-    offy = yarray[masky];
-    
-    maskx = (mask & (0xf000 >> (offy << 2))) >> ((offy ^ 3) << 2);
-    
-    
-    offx = xarray[maskx];
-    
-    cvarray[i].xoff = offx;
-    cvarray[i].yoff = offy;
-  }
-}
-
-static uint16_t decompress_cvmask_frombyte(uint8_t x)
-{
-  uint16_t y = (x & 1) | ((x & 2) << 4) | (x & 4) | ((x & 8) << 4) |
-    ((x & 0x10) << 4) | ((x & 0x20) << 8) | ((x & 0x40) << 4) | ((x & 0x80) << 8);
-  return y;
 }
 
 static void lookup_cvmask_derivatives(uint32_t mask, uint8_t* offx, uint8_t* offy, uint32_t* curpixel_cvg, uint32_t* curpixel_cvbit)
