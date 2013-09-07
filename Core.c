@@ -1054,117 +1054,164 @@ static void vi_fetch_filter32(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint
   res->cvg = cur_cvg;
 }
 
+static void SET_SUBA_RGB_INPUT(int32_t **input_r,
+  int32_t **input_g, int32_t **input_b, int code) {
 
+  static int32_t *red_inputs[16] align(64) = {
+    &combined_color.r, &texel0_color.r, &texel1_color.r, &prim_color.r,
+    &shade_color.r,    &env_color.r,    &one_color,      &noise,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
 
-static void SET_SUBA_RGB_INPUT(int32_t **input_r, int32_t **input_g, int32_t **input_b, int code)
-{
-  switch (code & 0xf)
-  {
-    case 0:   *input_r = &combined_color.r; *input_g = &combined_color.g; *input_b = &combined_color.b; break;
-    case 1:   *input_r = &texel0_color.r;   *input_g = &texel0_color.g;   *input_b = &texel0_color.b;   break;
-    case 2:   *input_r = &texel1_color.r;   *input_g = &texel1_color.g;   *input_b = &texel1_color.b;   break;
-    case 3:   *input_r = &prim_color.r;   *input_g = &prim_color.g;   *input_b = &prim_color.b;   break;
-    case 4:   *input_r = &shade_color.r;    *input_g = &shade_color.g;    *input_b = &shade_color.b;    break;
-    case 5:   *input_r = &env_color.r;    *input_g = &env_color.g;    *input_b = &env_color.b;    break;
-    case 6:   *input_r = &one_color;      *input_g = &one_color;      *input_b = &one_color;    break;
-    case 7:   *input_r = &noise;        *input_g = &noise;        *input_b = &noise;        break;
-    case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
-    {
-      *input_r = &zero_color;   *input_g = &zero_color;   *input_b = &zero_color;   break;
-    }
-  }
+  static int32_t *green_inputs[16] align(64) = {
+    &combined_color.g, &texel0_color.g, &texel1_color.g, &prim_color.g,
+    &shade_color.g,    &env_color.g,    &one_color,      &noise,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
+
+  static int32_t *blue_inputs[16] align(64) = {
+    &combined_color.b, &texel0_color.b, &texel1_color.b, &prim_color.b,
+    &shade_color.b,    &env_color.b,    &one_color,      &noise,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
+
+  code &= 0x0F;
+  *input_r = red_inputs[code];
+  *input_g = green_inputs[code];
+  *input_b = blue_inputs[code];
 }
 
-static void SET_SUBB_RGB_INPUT(int32_t **input_r, int32_t **input_g, int32_t **input_b, int code)
-{
-  switch (code & 0xf)
-  {
-    case 0:   *input_r = &combined_color.r; *input_g = &combined_color.g; *input_b = &combined_color.b; break;
-    case 1:   *input_r = &texel0_color.r;   *input_g = &texel0_color.g;   *input_b = &texel0_color.b;   break;
-    case 2:   *input_r = &texel1_color.r;   *input_g = &texel1_color.g;   *input_b = &texel1_color.b;   break;
-    case 3:   *input_r = &prim_color.r;   *input_g = &prim_color.g;   *input_b = &prim_color.b;   break;
-    case 4:   *input_r = &shade_color.r;    *input_g = &shade_color.g;    *input_b = &shade_color.b;    break;
-    case 5:   *input_r = &env_color.r;    *input_g = &env_color.g;    *input_b = &env_color.b;    break;
-    case 6:   *input_r = &key_center.r;   *input_g = &key_center.g;   *input_b = &key_center.b;   break;
-    case 7:   *input_r = &k4;         *input_g = &k4;         *input_b = &k4;         break;
-    case 8: case 9: case 10: case 11: case 12: case 13: case 14: case 15:
-    {
-      *input_r = &zero_color;   *input_g = &zero_color;   *input_b = &zero_color;   break;
-    }
-  }
+static void SET_SUBB_RGB_INPUT(int32_t **input_r,
+  int32_t **input_g, int32_t **input_b, int code) {
+
+  static int32_t *red_inputs[16] align(64) = {
+    &combined_color.r, &texel0_color.r, &texel1_color.r, &prim_color.r,
+    &shade_color.r,    &env_color.r,    &key_center.r,   &k4,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
+
+  static int32_t *green_inputs[16] align(64) = {
+    &combined_color.g, &texel0_color.g, &texel1_color.g, &prim_color.g,
+    &shade_color.g,    &env_color.g,    &key_center.g,   &k4,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
+
+  static int32_t *blue_inputs[16] align(64) = {
+    &combined_color.b, &texel0_color.b, &texel1_color.b, &prim_color.b,
+    &shade_color.b,    &env_color.b,    &key_center.b,   &k4,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+    &zero_color,       &zero_color,     &zero_color,     &zero_color,
+  };
+
+  code &= 0x0F;
+  *input_r = red_inputs[code];
+  *input_g = green_inputs[code];
+  *input_b = blue_inputs[code];
 }
 
-static void SET_MUL_RGB_INPUT(int32_t **input_r, int32_t **input_g, int32_t **input_b, int code)
-{
-  switch (code & 0x1f)
-  {
-    case 0:   *input_r = &combined_color.r; *input_g = &combined_color.g; *input_b = &combined_color.b; break;
-    case 1:   *input_r = &texel0_color.r;   *input_g = &texel0_color.g;   *input_b = &texel0_color.b;   break;
-    case 2:   *input_r = &texel1_color.r;   *input_g = &texel1_color.g;   *input_b = &texel1_color.b;   break;
-    case 3:   *input_r = &prim_color.r;   *input_g = &prim_color.g;   *input_b = &prim_color.b;   break;
-    case 4:   *input_r = &shade_color.r;    *input_g = &shade_color.g;    *input_b = &shade_color.b;    break;
-    case 5:   *input_r = &env_color.r;    *input_g = &env_color.g;    *input_b = &env_color.b;    break;
-    case 6:   *input_r = &key_scale.r;    *input_g = &key_scale.g;    *input_b = &key_scale.b;    break;
-    case 7:   *input_r = &combined_color.a; *input_g = &combined_color.a; *input_b = &combined_color.a; break;
-    case 8:   *input_r = &texel0_color.a;   *input_g = &texel0_color.a;   *input_b = &texel0_color.a;   break;
-    case 9:   *input_r = &texel1_color.a;   *input_g = &texel1_color.a;   *input_b = &texel1_color.a;   break;
-    case 10:  *input_r = &prim_color.a;   *input_g = &prim_color.a;   *input_b = &prim_color.a;   break;
-    case 11:  *input_r = &shade_color.a;    *input_g = &shade_color.a;    *input_b = &shade_color.a;    break;
-    case 12:  *input_r = &env_color.a;    *input_g = &env_color.a;    *input_b = &env_color.a;    break;
-    case 13:  *input_r = &lod_frac;     *input_g = &lod_frac;     *input_b = &lod_frac;     break;
-    case 14:  *input_r = &primitive_lod_frac; *input_g = &primitive_lod_frac; *input_b = &primitive_lod_frac; break;
-    case 15:  *input_r = &k5;         *input_g = &k5;         *input_b = &k5;         break;
-    case 16: case 17: case 18: case 19: case 20: case 21: case 22: case 23:
-    case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31:
-    {
-      *input_r = &zero_color;   *input_g = &zero_color;   *input_b = &zero_color;   break;
-    }
-  }
+static void SET_MUL_RGB_INPUT(int32_t **input_r,
+  int32_t **input_g, int32_t **input_b, int code) {
+
+  static int32_t *red_inputs[32] align(64) = {
+    &combined_color.r, &texel0_color.r, &texel1_color.r,     &prim_color.r,
+    &shade_color.r,    &env_color.r,    &key_center.r,       &combined_color.a,
+    &texel0_color.a,   &texel1_color.a, &prim_color.a,       &shade_color.a,
+    &env_color.a,      &lod_frac,       &primitive_lod_frac, &k5,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+  };
+
+  static int32_t *green_inputs[32] align(64) = {
+    &combined_color.g, &texel0_color.g, &texel1_color.g,     &prim_color.g,
+    &shade_color.g,    &env_color.g,    &key_center.g,       &combined_color.a,
+    &texel0_color.a,   &texel1_color.a, &prim_color.a,       &shade_color.a,
+    &env_color.a,      &lod_frac,       &primitive_lod_frac, &k5,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+  };
+
+  static int32_t *blue_inputs[32] align(64) = {
+    &combined_color.b, &texel0_color.b, &texel1_color.b,     &prim_color.b,
+    &shade_color.b,    &env_color.b,    &key_center.b,       &combined_color.a,
+    &texel0_color.a,   &texel1_color.a, &prim_color.a,       &shade_color.a,
+    &env_color.a,      &lod_frac,       &primitive_lod_frac, &k5,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+    &zero_color,       &zero_color,     &zero_color,         &zero_color,
+  };
+
+  code &= 0x1F;
+  *input_r = red_inputs[code];
+  *input_g = green_inputs[code];
+  *input_b = blue_inputs[code];
+}
+  
+static void SET_ADD_RGB_INPUT(int32_t **input_r,
+  int32_t **input_g, int32_t **input_b, int code) {
+
+  static int32_t *red_inputs[8] align(64) = {
+    &combined_color.r, &texel0_color.r, &texel1_color.r, &prim_color.r,
+    &shade_color.r,    &env_color.r,    &one_color,      &zero_color,
+  };
+
+  static int32_t *green_inputs[8] align(64) = {
+    &combined_color.g, &texel0_color.g, &texel1_color.g, &prim_color.g,
+    &shade_color.g,    &env_color.g,    &one_color,      &zero_color,
+  };
+
+  static int32_t *blue_inputs[8] align(64) = {
+    &combined_color.b, &texel0_color.b, &texel1_color.b, &prim_color.b,
+    &shade_color.b,    &env_color.b,    &one_color,      &zero_color,
+  };
+
+  code &= 0x07;
+  *input_r = red_inputs[code];
+  *input_g = green_inputs[code];
+  *input_b = blue_inputs[code];
 }
 
-static void SET_ADD_RGB_INPUT(int32_t **input_r, int32_t **input_g, int32_t **input_b, int code)
-{
-  switch (code & 0x7)
-  {
-    case 0:   *input_r = &combined_color.r; *input_g = &combined_color.g; *input_b = &combined_color.b; break;
-    case 1:   *input_r = &texel0_color.r;   *input_g = &texel0_color.g;   *input_b = &texel0_color.b;   break;
-    case 2:   *input_r = &texel1_color.r;   *input_g = &texel1_color.g;   *input_b = &texel1_color.b;   break;
-    case 3:   *input_r = &prim_color.r;   *input_g = &prim_color.g;   *input_b = &prim_color.b;   break;
-    case 4:   *input_r = &shade_color.r;    *input_g = &shade_color.g;    *input_b = &shade_color.b;    break;
-    case 5:   *input_r = &env_color.r;    *input_g = &env_color.g;    *input_b = &env_color.b;    break;
-    case 6:   *input_r = &one_color;      *input_g = &one_color;      *input_b = &one_color;      break;
-    case 7:   *input_r = &zero_color;     *input_g = &zero_color;     *input_b = &zero_color;     break;
-  }
+static void SET_SUB_ALPHA_INPUT(int32_t **input, int code) {
+
+  static int32_t *alpha_inputs[8] align(64) = {
+    &combined_color.a,
+    &texel0_color.a,
+    &texel1_color.a,
+    &prim_color.a,
+    &shade_color.a,
+    &env_color.a,
+    &one_color,
+    &zero_color,
+  };
+
+  code &= 0x07;
+  *input = alpha_inputs[code];
 }
 
-static void SET_SUB_ALPHA_INPUT(int32_t **input, int code)
-{
-  switch (code & 0x7)
-  {
-    case 0:   *input = &combined_color.a; break;
-    case 1:   *input = &texel0_color.a; break;
-    case 2:   *input = &texel1_color.a; break;
-    case 3:   *input = &prim_color.a; break;
-    case 4:   *input = &shade_color.a; break;
-    case 5:   *input = &env_color.a; break;
-    case 6:   *input = &one_color; break;
-    case 7:   *input = &zero_color; break;
-  }
-}
+static void SET_MUL_ALPHA_INPUT(int32_t **input, int code) {
 
-static void SET_MUL_ALPHA_INPUT(int32_t **input, int code)
-{
-  switch (code & 0x7)
-  {
-    case 0:   *input = &lod_frac; break;
-    case 1:   *input = &texel0_color.a; break;
-    case 2:   *input = &texel1_color.a; break;
-    case 3:   *input = &prim_color.a; break;
-    case 4:   *input = &shade_color.a; break;
-    case 5:   *input = &env_color.a; break;
-    case 6:   *input = &primitive_lod_frac; break;
-    case 7:   *input = &zero_color; break;
-  }
+  static int32_t *alpha_inputs[8] align(64) = {
+    &lod_frac,
+    &texel0_color.a,
+    &texel1_color.a,
+    &prim_color.a,
+    &shade_color.a,
+    &env_color.a,
+    &primitive_lod_frac,
+    &zero_color,
+  };
+
+  code &= 0x07;
+  *input = alpha_inputs[code];
 }
 
 static void combiner_1cycle(int adseed, uint32_t* curpixel_cvg)
