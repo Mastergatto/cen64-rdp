@@ -40,7 +40,6 @@
 #define GET_MED(x)  (((x) & 0x7c0) >> 3)
 #define GET_HI(x) (((x) >> 8) & 0xf8)
 
-
 #define GET_LOW_RGBA16_TMEM(x)  (replicated_rgba[((x) >> 1) & 0x1f])
 #define GET_MED_RGBA16_TMEM(x)  (replicated_rgba[((x) >> 6) & 0x1f])
 #define GET_HI_RGBA16_TMEM(x) (replicated_rgba[(x) >> 11])
@@ -79,7 +78,6 @@ static void popmessage(const char* err, ...)
 uint32_t rdp_cmd_data[0x10000];
 uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
-uint32_t ptr_onstart = 0;
 
 int blshifta = 0, blshiftb = 0, pastblshifta = 0, pastblshiftb = 0;
 uint32_t plim = 0x3fffff;
@@ -112,8 +110,6 @@ int spans_drdy, spans_dgdy, spans_dbdy, spans_dady, spans_dzdy;
 int spans_cdr, spans_cdg, spans_cdb, spans_cda, spans_cdz;
 
 static int spans_dsdy, spans_dtdy, spans_dwdy;
-
-
 
 typedef struct
 {
@@ -188,8 +184,6 @@ typedef struct
   int add_a1;
 } COMBINE_MODES;
 
-
-
 #define PIXEL_SIZE_4BIT     0
 #define PIXEL_SIZE_8BIT     1
 #define PIXEL_SIZE_16BIT    2
@@ -200,13 +194,11 @@ typedef struct
 #define CYCLE_TYPE_COPY     2
 #define CYCLE_TYPE_FILL     3
 
-
 #define FORMAT_RGBA       0
 #define FORMAT_YUV        1
 #define FORMAT_CI       2
 #define FORMAT_IA       3
 #define FORMAT_I        4
-
 
 #define TEXEL_RGBA4       0
 #define TEXEL_RGBA8       1
@@ -229,12 +221,10 @@ typedef struct
 #define TEXEL_I16       0x12
 #define TEXEL_I32       0x13
 
-
 #define CVG_CLAMP       0
 #define CVG_WRAP        1
 #define CVG_ZAP         2
 #define CVG_SAVE        3
-
 
 #define ZMODE_OPAQUE      0
 #define ZMODE_INTERPENETRATING  1
@@ -265,7 +255,6 @@ int32_t keyalpha;
 
 static int32_t blenderone = 0xff;
 
-
 static int32_t *combiner_rgbsub_a_r[2];
 static int32_t *combiner_rgbsub_a_g[2];
 static int32_t *combiner_rgbsub_a_b[2];
@@ -283,7 +272,6 @@ static int32_t *combiner_alphasub_a[2];
 static int32_t *combiner_alphasub_b[2];
 static int32_t *combiner_alphamul[2];
 static int32_t *combiner_alphaadd[2];
-
 
 static int32_t *blender1a_r[2];
 static int32_t *blender1a_g[2];
@@ -329,7 +317,6 @@ uint8_t TMEM[0x1000];
 #define tlut ((uint16_t*)(&TMEM[0x800]))
 
 #define PIXELS_TO_BYTES(pix, siz) (((pix) << (siz)) >> 1)
-
 
 static void rdp_set_other_modes(uint32_t w1, uint32_t w2);
 static void fetch_texel(COLOR *color, int s, int t, uint32_t tilenum);
@@ -596,7 +583,6 @@ int32_t* PreScale;
 uint32_t tvfadeoutstate[625];
 int rdp_pipeline_crashed = 0;
 
-
 static void tcmask(int32_t* S, int32_t* T, int32_t num);
 static void tcmask(int32_t* S, int32_t* T, int32_t num)
 {
@@ -628,14 +614,12 @@ static void tcmask(int32_t* S, int32_t* T, int32_t num)
   }
 }
 
-
 static void tcmask_coupled(int32_t* S, int32_t* S1, int32_t* T, int32_t* T1, int32_t num);
 static void tcmask_coupled(int32_t* S, int32_t* S1, int32_t* T, int32_t* T1, int32_t num)
 {
   int32_t wrap;
   int32_t maskbits; 
   int32_t wrapthreshold; 
-
 
   if (tile[num].mask_s)
   {
@@ -672,7 +656,6 @@ static void tcmask_coupled(int32_t* S, int32_t* S1, int32_t* T, int32_t* T1, int
     *T1 &= maskbits;
   }
 }
-
 
 static void tcmask_copy(int32_t* S, int32_t* S1, int32_t* S2, int32_t* S3, int32_t* T, int32_t num);
 static void tcmask_copy(int32_t* S, int32_t* S1, int32_t* S2, int32_t* S3, int32_t* T, int32_t num)
@@ -720,11 +703,8 @@ static void tcmask_copy(int32_t* S, int32_t* S1, int32_t* S2, int32_t* S3, int32
   }
 }
 
-
 static void tcshift_cycle(int32_t* S, int32_t* T, int32_t* maxs, int32_t* maxt, uint32_t num)
 {
-
-
 
   int32_t coord = *S;
   int32_t shifter = tile[num].shift_s;
@@ -765,7 +745,6 @@ static void tcshift_cycle(int32_t* S, int32_t* T, int32_t* maxs, int32_t* maxt, 
   *maxt = ((coord >> 3) >= tile[num].th);
 } 
 
-
 static void tcshift_copy(int32_t* S, int32_t* T, uint32_t num)
 {
   int32_t coord = *S;
@@ -799,7 +778,6 @@ static void tcshift_copy(int32_t* S, int32_t* T, uint32_t num)
   *T = coord; 
   
 }
-
 
 static void tcclamp_cycle(int32_t* S, int32_t* T, int32_t* SFRAC, int32_t* TFRAC, int32_t maxs, int32_t maxt, int32_t num)
 {
@@ -848,7 +826,6 @@ static void tcclamp_cycle(int32_t* S, int32_t* T, int32_t* SFRAC, int32_t* TFRAC
     *T = (loct >> 5);
 }
 
-
 static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t maxt, int32_t num)
 {
   int32_t locs = *S, loct = *T;
@@ -882,7 +859,6 @@ static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t ma
   else
     *T = (loct >> 5);
 }
-
 
 int rdp_init()
 {
@@ -931,8 +907,6 @@ int rdp_init()
   memset(&onetimewarnings, 0, sizeof(onetimewarnings));
 
   precalculate_everything();
-
-
 
 #ifdef WIN32
   if (IsBadPtrW32(&rdram[0x7f0000 >> 2],16))
@@ -1556,8 +1530,6 @@ static void SET_BLENDER_INPUT(int cycle, int which, int32_t **input_r, int32_t *
   }
 }
 
-
-
 static const uint8_t bayer_matrix[16] =
 {
    0,  4,  1, 5,
@@ -1565,7 +1537,6 @@ static const uint8_t bayer_matrix[16] =
    3,  7,  2, 6,
    7,  3,  6, 2
 };
-
 
 static const uint8_t magic_matrix[16] =
 {
@@ -1688,8 +1659,6 @@ static int blender_2cycle(uint32_t* fr, uint32_t* fg, uint32_t* fb, int dith, ui
   else 
     return 0;
 }
-
-
 
 static void fetch_texel(COLOR *color, int s, int t, uint32_t tilenum)
 {
@@ -2122,8 +2091,6 @@ static void fetch_texel_entlut(COLOR *color, int s, int t, uint32_t tilenum)
   }
 
 }
-
-
 
 static void fetch_texel_quadro(COLOR *color0, COLOR *color1, COLOR *color2, COLOR *color3, int s0, int s1, int t0, int t1, uint32_t tilenum)
 {
@@ -3237,7 +3204,6 @@ static void fetch_texel_entlut_quadro(COLOR *color0, COLOR *color1, COLOR *color
   }
 }
 
-
 void get_tmem_idx(int s, int t, uint32_t tilenum, uint32_t* idx0, uint32_t* idx1, uint32_t* idx2, uint32_t* idx3, uint32_t* bit3flipped, uint32_t* hibit)
 {
   uint32_t tbase = (tile[tilenum].line * t) & 0x1ff;
@@ -3278,12 +3244,6 @@ void get_tmem_idx(int s, int t, uint32_t tilenum, uint32_t* idx0, uint32_t* idx1
   sort_tmem_idx(idx2, tidx_a, tidx_b, tidx_c, tidx_d, 2);
   sort_tmem_idx(idx3, tidx_a, tidx_b, tidx_c, tidx_d, 3);
 }
-
-
-
-
-
-
 
 void read_tmem_copy(int s, int s1, int s2, int s3, int t, uint32_t tilenum, uint32_t* sortshort, int* hibits, int* lowbits)
 {
@@ -3439,9 +3399,6 @@ void read_tmem_copy(int s, int s1, int s2, int s3, int t, uint32_t tilenum, uint
   }
 }
 
-
-
-
 void sort_tmem_idx(uint32_t *idx, uint32_t idxa, uint32_t idxb, uint32_t idxc, uint32_t idxd, uint32_t bankno)
 {
   if ((idxa & 3) == bankno)
@@ -3455,7 +3412,6 @@ void sort_tmem_idx(uint32_t *idx, uint32_t idxa, uint32_t idxb, uint32_t idxc, u
   else
     *idx = 0;
 }
-
 
 void sort_tmem_shorts_lowhalf(uint32_t* bindshort, uint32_t short0, uint32_t short1, uint32_t short2, uint32_t short3, uint32_t bankno)
 {
@@ -3476,8 +3432,6 @@ void sort_tmem_shorts_lowhalf(uint32_t* bindshort, uint32_t short0, uint32_t sho
   }
 }
 
-
-
 void compute_color_index(uint32_t* cidx, uint32_t readshort, uint32_t nybbleoffset, uint32_t tilenum)
 {
   uint32_t lownib, hinib;
@@ -3494,7 +3448,6 @@ void compute_color_index(uint32_t* cidx, uint32_t readshort, uint32_t nybbleoffs
   lownib = (readshort >> lownib) & 0xf;
   *cidx = (hinib << 4) | lownib;
 }
-
 
 void replicate_for_copy(uint32_t* outbyte, uint32_t inshort, uint32_t nybbleoffset, uint32_t tilenum, uint32_t tformat, uint32_t tsize)
 {
@@ -3602,9 +3555,6 @@ static void texture_pipeline_cycle(COLOR* TEX, COLOR* prev, int32_t SSS, int32_t
 {
 #define TRELATIVE(x, y)   ((x) - ((y) << 3));
 #define UPPER ((sfrac + tfrac) & 0x20)
-
-
-
 
   int32_t maxs, maxt, invt0r, invt0g, invt0b, invt0a;
   int32_t sfrac, tfrac, invsf, invtf;
@@ -3806,7 +3756,6 @@ static void texture_pipeline_cycle(COLOR* TEX, COLOR* prev, int32_t SSS, int32_t
                                                   
 }
 
-
 static void tc_pipeline_copy(int32_t* sss0, int32_t* sss1, int32_t* sss2, int32_t* sss3, int32_t* sst, int tilenum)                     
 {
   int ss0 = *sss0, ss1 = 0, ss2 = 0, ss3 = 0, st = *sst;
@@ -3859,8 +3808,6 @@ static void tc_pipeline_load(int32_t* sss, int32_t* sst, int tilenum, int coord_
   *sss = sss1;
   *sst = sst1;
 }
-
-
 
 void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
 {
@@ -4046,7 +3993,6 @@ void render_spans_1cycle_complete(int start, int end, int tilenum, int flip)
   }
 }
 
-
 void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
 {
   int zb = zb_address >> 1;
@@ -4177,7 +4123,6 @@ void render_spans_1cycle_notexel1(int start, int end, int tilenum, int flip)
     }
   }
 }
-
 
 void render_spans_1cycle_notex(int start, int end, int tilenum, int flip)
 {
@@ -4493,8 +4438,6 @@ void render_spans_2cycle_complete(int start, int end, int tilenum, int flip)
   }
 }
 
-
-
 void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
 {
   int zb = zb_address >> 1;
@@ -4640,7 +4583,6 @@ void render_spans_2cycle_notexelnext(int start, int end, int tilenum, int flip)
   }
 }
 
-
 void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
 {
   int zb = zb_address >> 1;
@@ -4784,7 +4726,6 @@ void render_spans_2cycle_notexel1(int start, int end, int tilenum, int flip)
     }
   }
 }
-
 
 void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
 {
@@ -5112,7 +5053,6 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
   }
 }
 
-
 void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut)
 {
   int i, j;
@@ -5350,7 +5290,6 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
         }
       break;
       }
-
 
       s = (s + dsinc) & ~0x1f;
       t = (t + dtinc) & ~0x1f;
@@ -5799,8 +5738,6 @@ static void edgewalker_for_prims(const int32_t* ewdata)
   
 }
 
-
-
 static void edgewalker_for_loads(int32_t* lewdata)
 {
   int j = 0;
@@ -5849,7 +5786,6 @@ static void edgewalker_for_loads(int32_t* lewdata)
   span[j].s = s & ~0x3ff;                   \
   span[j].t = t & ~0x3ff;                   \
 }
-
 
 #define ADDVALUES_LOAD() {  \
       t += dtde;    \
@@ -5928,12 +5864,7 @@ static void edgewalker_for_loads(int32_t* lewdata)
   loading_pipeline(yhlimit >> 2, yllimit >> 2, tilenum, coord_quad, ltlut);
 }
 
-
-static const char *const image_format[] = { "RGBA", "YUV", "CI", "IA", "I", "???", "???", "???" };
-static const char *const image_size[] = { "4-bit", "8-bit", "16-bit", "32-bit" };
-
-static const uint32_t rdp_command_length[64] =
-{
+static const uint32_t rdp_command_length[64] = {
   8,      
   8,      
   8,      
@@ -6187,48 +6118,19 @@ static void rdp_tex_rect_flip(uint32_t w1, uint32_t w2)
 
 static void rdp_sync_load(uint32_t w1, uint32_t w2)
 {
-  
 }
 
 static void rdp_sync_pipe(uint32_t w1, uint32_t w2)
 {
-  
-  
 }
 
 static void rdp_sync_tile(uint32_t w1, uint32_t w2)
 {
-  
 }
 
 static void rdp_sync_full(uint32_t w1, uint32_t w2)
 {
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
   z64gl_command = 0;
-
   BusRaiseRCPInterrupt(my_rdp->bus, MI_INTR_DP);
 }
 
@@ -6658,11 +6560,7 @@ static void rdp_set_color_image(uint32_t w1, uint32_t w2)
   fbfill_ptr = fbfill_func[fb_size];
 }
 
-
-
-static void (*const rdp_command_table[64])(uint32_t w1, uint32_t w2) =
-{
-  
+static void (*const rdp_command_table[64])(uint32_t w1, uint32_t w2) = {
   rdp_noop,     rdp_invalid,      rdp_invalid,      rdp_invalid,
   rdp_invalid,    rdp_invalid,      rdp_invalid,      rdp_invalid,
   rdp_tri_noshade,  rdp_tri_noshade_z,    rdp_tri_tex,      rdp_tri_tex_z,
@@ -6692,87 +6590,50 @@ void RDPProcessList(struct RDP *rdp)
   uint32_t dp_current_al = my_rdp->regs[DPC_CURRENT_REG] & ~7, dp_end_al = my_rdp->regs[DPC_END_REG] & ~7; 
 
   my_rdp->regs[DPC_STATUS_REG] &= ~DP_STATUS_FREEZE;
-  
-  
-  
-  
-
-  
 
   if (dp_end_al <= dp_current_al)
-  {
-    
-    
-    
-    
-    
-    
     return;
-  }
 
   length = (dp_end_al - dp_current_al) >> 2;
 
-  ptr_onstart = rdp_cmd_ptr;
-
-  
-
-  
-  
-  
-  
-  
-
-  
   if ((rdp_cmd_ptr + length) & ~0xffff)
-    fatalerror("rdp_process_list: rdp_cmd_ptr overflow: length 0x%x ptr_onstart 0x%x", length, ptr_onstart);
-
+    fatalerror("rdp_process_list: rdp_cmd_ptr overflow: length 0x%x rdp_cmd_ptr 0x%x", length, rdp_cmd_ptr);
   
   dp_current_al >>= 2;
 
-  if (my_rdp->regs[DPC_STATUS_REG] & DP_STATUS_XBUS_DMA)
-  {
-    for (i = 0; i < length; i ++)
-    {
+  if (my_rdp->regs[DPC_STATUS_REG] & DP_STATUS_XBUS_DMA) {
+    for (i = 0; i < length; i++) {
       rdp_cmd_data[rdp_cmd_ptr] = __builtin_bswap32(rsp_dmem[dp_current_al & 0x3ff]);
       rdp_cmd_ptr++;
       dp_current_al++;
     }
   }
-  else
-  {
-    for (i = 0; i < length; i ++)
-    {
+
+  else {
+    for (i = 0; i < length; i++) {
       rdp_cmd_data[rdp_cmd_ptr] = RREADIDX32(dp_current_al & 0x3fffff);
       rdp_cmd_ptr++;
       dp_current_al++;
     }
   }
-  
 
   while (rdp_cmd_cur < rdp_cmd_ptr && !rdp_pipeline_crashed)
   {
     cmd = (rdp_cmd_data[rdp_cmd_cur] >> 24) & 0x3f;
     cmd_length = rdp_command_length[cmd] >> 2;
-
     
-    
-    if ((rdp_cmd_ptr - rdp_cmd_cur) < cmd_length)
-    {
-      
+    if ((rdp_cmd_ptr - rdp_cmd_cur) < cmd_length) {
       my_rdp->regs[DPC_START_REG] = my_rdp->regs[DPC_CURRENT_REG] = my_rdp->regs[DPC_END_REG];
       return;
     }
     
     rdp_command_table[cmd](rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur + 1]);
-    
     rdp_cmd_cur += cmd_length;
   };
+
   rdp_cmd_ptr = 0;
   rdp_cmd_cur = 0;
   my_rdp->regs[DPC_START_REG] = my_rdp->regs[DPC_CURRENT_REG] = my_rdp->regs[DPC_END_REG];
-  
-  
-  
 }
 
 static int alpha_compare(int32_t comb_alpha)
@@ -6796,10 +6657,6 @@ static int alpha_compare(int32_t comb_alpha)
 static int32_t color_combiner_equation(int32_t a, int32_t b, int32_t c, int32_t d)
 {
 
-
-
-
-
   a = special_9bit_exttable[a];
   b = special_9bit_exttable[b];
   c = SIGNF(c, 9);
@@ -6817,7 +6674,6 @@ static int32_t alpha_combiner_equation(int32_t a, int32_t b, int32_t c, int32_t 
   a = (((a - b) * c) + (d << 8) + 0x80) >> 8;
   return (a & 0x1ff);
 }
-
 
 static void blender_equation_cycle0(int* r, int* g, int* b)
 {
@@ -6916,9 +6772,6 @@ static void blender_equation_cycle1(int* r, int* g, int* b)
     *b = (blb >> 5) & 0xff;
   }
 }
-
-
-
 
 static uint32_t rightcvghex(uint32_t x, uint32_t fmask)
 {
@@ -7518,7 +7371,6 @@ static uint32_t dz_compress(uint32_t value) {
 static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int dzpixenc, uint32_t* blend_en, uint32_t* prewrap, uint32_t* curpixel_cvg, uint32_t curpixel_memcvg)
 {
 
-
   int force_coplanar = 0;
   sz &= 0x3ffff;
 
@@ -7705,7 +7557,6 @@ static void calculate_clamp_diffs(uint32_t i)
   tile[i].f.clampdifft = ((tile[i].th >> 2) - (tile[i].tl >> 2)) & 0x3ff;
 }
 
-
 static void calculate_tile_derivs(uint32_t i)
 {
   tile[i].f.clampens = tile[i].cs || !tile[i].mask_s;
@@ -7764,7 +7615,6 @@ static void rgb_dither_complete(int* r, int* g, int* b, int dith)
 static void rgb_dither_nothing(int* r, int* g, int* b, int dith)
 {
 }
-
 
 static void get_dither_noise_complete(int x, int y, int* cdith, int* adith)
 {
@@ -7852,7 +7702,6 @@ static void get_dither_noise_complete(int x, int y, int* cdith, int* adith)
     break;
   }
 }
-
 
 static void get_dither_only(int x, int y, int* cdith, int* adith)
 {
@@ -8028,15 +7877,12 @@ uint32_t vi_integer_sqrt(uint32_t a)
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst)
 {
 
-
-
   *sss = (SIGN16(ss)) & 0x1ffff;
   *sst = (SIGN16(st)) & 0x1ffff;
 }
 
 static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst)
 {
-
 
   int w_carry = 0;
   int shift; 
@@ -8115,13 +7961,6 @@ static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_
 static void tclod_2cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2)
 {
 
-
-
-
-
-
-
-
   int nextys, nextyt, nextysw;
   int lodclamp = 0;
   int32_t lod = 0;
@@ -8186,7 +8025,6 @@ static void tclod_2cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int3
   }
 }
 
-
 static void tclod_2cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1, int32_t* t2)
 {
   int nextys, nextyt, nextysw, nexts, nextt, nextsw;
@@ -8246,7 +8084,6 @@ static void tclod_2cycle_current_simple(int32_t* sss, int32_t* sst, int32_t s, i
     }
   }
 }
-
 
 static void tclod_2cycle_current_notexel1(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1)
 {
@@ -8583,9 +8420,6 @@ static void tclod_1cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, 
 static void tclod_copy(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t prim_tile, int32_t* t1)
 {
 
-
-
-
   int nexts, nextt, nextsw, fars, fart, farsw;
   int lodclamp = 0;
   int32_t lod = 0;
@@ -8666,12 +8500,8 @@ static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t
   tcdiv_ptr(nexts, nextt, nextsw, s1, t1);
 }
 
-
-
 void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext, int32_t previous, int32_t* lod)
 {
-
-
 
   int dels = SIGN(snext, 17) - SIGN(scurr, 17);
   if (dels & 0x20000)
