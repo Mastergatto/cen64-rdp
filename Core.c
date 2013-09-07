@@ -76,12 +76,6 @@ static void popmessage(const char* err, ...)
   va_end(arg);
 }
 
-
-#define LOG_RDP_EXECUTION 0
-#define DETAILED_LOGGING 0
-
-FILE *rdp_exec;
-
 uint32_t rdp_cmd_data[0x10000];
 uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
@@ -367,7 +361,6 @@ static int blender_2cycle(uint32_t* fr, uint32_t* fg, uint32_t* fb, int dith, ui
 static void texture_pipeline_cycle(COLOR* TEX, COLOR* prev, int32_t SSS, int32_t SST, uint32_t tilenum, uint32_t cycle);
 static void tc_pipeline_copy(int32_t* sss0, int32_t* sss1, int32_t* sss2, int32_t* sss3, int32_t* sst, int tilenum);
 static void tc_pipeline_load(int32_t* sss, int32_t* sst, int tilenum, int coord_quad);
-static void tcclamp_generic(int32_t* S, int32_t* T, int32_t* SFRAC, int32_t* TFRAC, int32_t maxs, int32_t maxt, int32_t num);
 static void tcclamp_cycle(int32_t* S, int32_t* T, int32_t* SFRAC, int32_t* TFRAC, int32_t maxs, int32_t maxt, int32_t num);
 static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t maxt, int32_t num);
 static void tcshift_cycle(int32_t* S, int32_t* T, int32_t* maxs, int32_t* maxt, uint32_t num);
@@ -411,15 +404,6 @@ static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int d
 static int finalize_spanalpha(uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
 static int32_t normalize_dzpix(int32_t sum);
 static int32_t CLIP(int32_t value,int32_t min,int32_t max);
-static void video_filter16(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres, uint32_t centercvg);
-static void video_filter32(int* endr, int* endg, int* endb, uint32_t fboffset, uint32_t num, uint32_t hres, uint32_t centercvg);
-static void divot_filter(CCVG* final, CCVG centercolor, CCVG leftcolor, CCVG rightcolor);
-static void restore_filter16(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres);
-static void restore_filter32(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres);
-static void gamma_filters(int* r, int* g, int* b, int gamma_and_dither);
-static void adjust_brightness(int* r, int* g, int* b, int brightcoeff);
-static void clearscreen(uint32_t x0,uint32_t y0, uint32_t x1, uint32_t y1, uint32_t white);
-static void clearfb16(uint16_t* fb, uint32_t width,uint32_t height);
 static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
 static void tclod_1cycle_next(int32_t* sss, int32_t* sst, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs, int32_t* prelodfrac);
@@ -432,7 +416,6 @@ void tclod_4x17_to_15(int32_t scurr, int32_t snext, int32_t tcurr, int32_t tnext
 static void tclod_1cycle_current(int32_t* sss, int32_t* sst, int32_t nexts, int32_t nextt, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, int32_t prim_tile, int32_t* t1, SPANSIGS* sigs);
 static void get_texel1_1cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc, int32_t scanline, SPANSIGS* sigs);
 static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc);
-static void video_max_optimized(uint32_t* Pixels, uint32_t* pen);
 static void calculate_clamp_diffs(uint32_t tile);
 static void calculate_tile_derivs(uint32_t tile);
 static void rgb_dither_complete(int* r, int* g, int* b, int dith);
@@ -440,10 +423,7 @@ static void rgb_dither_nothing(int* r, int* g, int* b, int dith);
 static void get_dither_noise_complete(int x, int y, int* cdith, int* adith);
 static void get_dither_only(int x, int y, int* cdith, int* adith);
 static void get_dither_nothing(int x, int y, int* cdith, int* adith);
-static void vi_vl_lerp(CCVG* up, CCVG down, uint32_t frac);
 static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, int* z, uint32_t curpixel_cvg);
-static void vi_fetch_filter16(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint32_t fsaa, uint32_t dither_filter, uint32_t vres);
-static void vi_fetch_filter32(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint32_t fsaa, uint32_t dither_filter, uint32_t vres);
 int IsBadPtrW32(void *ptr, uint32_t bytes);
 uint32_t vi_integer_sqrt(uint32_t a);
 void deduce_derivatives(void);
@@ -463,12 +443,6 @@ struct {uint32_t shift; uint32_t add;} z_dec_table[8] = {
      {1, 0x3e000},
      {0, 0x3f000},
      {0, 0x3f800},
-};
-
-
-static void (*vi_fetch_filter_func[2])(CCVG*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = 
-{
-  vi_fetch_filter16, vi_fetch_filter32
 };
 
 static void (*fbread_func[4])(uint32_t, uint32_t*) = 
@@ -912,9 +886,6 @@ static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t ma
 
 int rdp_init()
 {
-  if (LOG_RDP_EXECUTION)
-    rdp_exec = fopen("rdp_execute.txt", "wt");
-
   combiner_rgbsub_a_r[0] = combiner_rgbsub_a_r[1] = &one_color;
   combiner_rgbsub_a_g[0] = combiner_rgbsub_a_g[1] = &one_color;
   combiner_rgbsub_a_b[0] = combiner_rgbsub_a_b[1] = &one_color;
@@ -986,72 +957,6 @@ int rdp_init()
   rdram_8 = (uint8_t*)rdram;
   rdram_16 = (uint16_t*)rdram;
   return 0;
-}
-
-
-static void vi_fetch_filter16(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint32_t fsaa, uint32_t dither_filter, uint32_t vres)
-{
-  int r, g, b;
-  uint32_t idx = (fboffset >> 1) + cur_x;
-  uint32_t pix, hval;
-  PAIRREAD16(pix, hval, idx); 
-  uint32_t cur_cvg;
-  if (fsaa)
-    cur_cvg = ((pix & 1) << 2) | hval;
-  else
-    cur_cvg = 7;
-  r = GET_HI(pix);
-  g = GET_MED(pix);
-  b = GET_LOW(pix);
-
-  uint32_t fbw = *vi_width & 0xfff;
-
-  if (cur_cvg == 7)
-  {
-    if (dither_filter)
-      restore_filter16(&r, &g, &b, fboffset, cur_x, fbw);
-  }
-  else
-  {
-    video_filter16(&r, &g, &b, fboffset, cur_x, fbw, cur_cvg);
-  }
-
-
-  res->r = r;
-  res->g = g;
-  res->b = b;
-  res->cvg = cur_cvg;
-}
-
-static void vi_fetch_filter32(CCVG* res, uint32_t fboffset, uint32_t cur_x, uint32_t fsaa, uint32_t dither_filter, uint32_t vres)
-{
-  int r, g, b;
-  uint32_t pix = RREADIDX32((fboffset >> 2) + cur_x);
-  uint32_t cur_cvg;
-  if (fsaa)
-    cur_cvg = (pix >> 5) & 7;
-  else
-    cur_cvg = 7;
-  r = (pix >> 24) & 0xff;
-  g = (pix >> 16) & 0xff;
-  b = (pix >> 8) & 0xff;
-
-  uint32_t fbw = *vi_width & 0xfff;
-  
-  if (cur_cvg == 7)
-  {
-    if (dither_filter)
-      restore_filter32(&r, &g, &b, fboffset, cur_x, fbw);
-  }
-  else
-  {
-    video_filter32(&r, &g, &b, fboffset, cur_x, fbw, cur_cvg);
-  }
-
-  res->r = r;
-  res->g = g;
-  res->b = b;
-  res->cvg = cur_cvg;
 }
 
 static void SET_SUBA_RGB_INPUT(int32_t **input_r,
@@ -1424,7 +1329,7 @@ static void combiner_2cycle(int adseed, uint32_t* curpixel_cvg)
 
 static void precalculate_everything(void)
 {
-  int i = 0, k = 0, j = 0;
+  int i = 0, k = 0;
 
   
   
@@ -3703,7 +3608,6 @@ static void texture_pipeline_cycle(COLOR* TEX, COLOR* prev, int32_t SSS, int32_t
 
   int32_t maxs, maxt, invt0r, invt0g, invt0b, invt0a;
   int32_t sfrac, tfrac, invsf, invtf;
-  int upper = 0;
   int bilerp = cycle ? other_modes.bi_lerp1 : other_modes.bi_lerp0;
   int convert = other_modes.convert_one && cycle;
   COLOR t0, t1, t2, t3;
@@ -5018,13 +4922,11 @@ void render_spans_fill(int start, int end, int flip)
   int xinc = flip ? 1 : -1;
 
   int xstart = 0, xendsc;
-  int prevxstart;
   int curpixel = 0;
   int x, length;
         
   for (i = start; i <= end; i++)
   {
-    prevxstart = xstart;
     xstart = span[i].lx;
     xendsc = span[i].rx;
 
@@ -5089,12 +4991,10 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
   xinc = FlipLUT[flip];
 
   int xstart = 0, xendsc;
-  int s = 0, t = 0, w = 0, ss = 0, st = 0, sw = 0, sss = 0, sst = 0, ssw = 0;
+  int s = 0, t = 0, w = 0, ss = 0, st = 0, sw = 0, sss = 0, sst = 0;
   int fb_index, length;
-  int diff = 0;
 
   uint32_t hidword = 0, lowdword = 0;
-  uint32_t hidword1 = 0, lowdword1 = 0;
   int fbadvance = (fb_size == PIXEL_SIZE_4BIT) ? 8 : 16 >> fb_size;
   uint32_t fbptr = 0;
   int fbptr_advance = flip ? 8 : -8;
@@ -5215,9 +5115,6 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
 
 void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut)
 {
-
-
-  int localdebugmode = 0, cnt = 0;
   int i, j;
 
   int dsinc, dtinc;
@@ -5226,7 +5123,7 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
 
   int s, t;
   int ss, st;
-  int xstart, xend, xendsc;
+  int xstart, xend;
   int sss = 0, sst = 0;
   int ti_index, length;
 
@@ -5287,7 +5184,6 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
   {
     xstart = span[i].lx;
     xend = span[i].unscrx;
-    xendsc = span[i].rx;
     s = span[i].s;
     t = span[i].t;
 
@@ -5555,8 +5451,6 @@ static void edgewalker_for_prims(const int32_t* ewdata)
 {
   int j = 0;
   int xleft = 0, xright = 0, xleft_inc = 0, xright_inc = 0;
-  int r = 0, g = 0, b = 0, a = 0, z = 0, s = 0, t = 0, w = 0;
-  int dr = 0, dg = 0, db = 0, da = 0;
   int tilenum = 0, flip = 0;
   int32_t yl = 0, ym = 0, yh = 0;
   int32_t xl = 0, xm = 0, xh = 0;
@@ -5600,7 +5494,7 @@ static void edgewalker_for_prims(const int32_t* ewdata)
 
   int32_t dzdx = ewdxvars[EWDX_DZDX];
   ClearLow5(spans, ewdxvars);
-  spans[SPAN_DZ] = ewdxvars[EWDX_DZDX];
+  spans[SPAN_DZ] = dzdx;
 
   spans_drdy = ewdyvars[EWDY_DRDY] >> 14;
   spans_dgdy = ewdyvars[EWDY_DGDY] >> 14;
@@ -5684,7 +5578,6 @@ static void edgewalker_for_prims(const int32_t* ewdata)
   int ycur =  yh & ~3;
   int ldflag = (sign_dxhdy ^ flip) ? 0 : 3;
   int invaly = 1;
-  int length = 0;
   int32_t xrsc = 0, xlsc = 0, stickybit = 0;
   int32_t yllimit = 0, yhlimit = 0;
   if (yl & 0x2000)
@@ -5912,20 +5805,17 @@ static void edgewalker_for_loads(int32_t* lewdata)
 {
   int j = 0;
   int xleft = 0, xright = 0;
-  int xstart = 0, xend = 0;
-  int s = 0, t = 0, w = 0;
+  int xend = 0;
+  int s = 0, t = 0;
   int dsdx = 0, dtdx = 0;
-  int dsdy = 0, dtdy = 0;
-  int dsde = 0, dtde = 0;
-  int tilenum = 0, flip = 0;
+  int dtde = 0;
+  int tilenum = 0;
   int32_t yl = 0, ym = 0, yh = 0;
   int32_t xl = 0, xm = 0, xh = 0;
-  int32_t dxldy = 0, dxhdy = 0, dxmdy = 0;
 
   int commandcode = (lewdata[0] >> 24) & 0x3f;
   int ltlut = (commandcode == 0x30);
   int coord_quad = ltlut || (commandcode == 0x33);
-  flip = 1;
   max_level = 0;
   tilenum = (lewdata[0] >> 16) & 7;
 
@@ -5939,45 +5829,20 @@ static void edgewalker_for_loads(int32_t* lewdata)
   xh = SIGN(lewdata[3], 30);
   xm = SIGN(lewdata[4], 30);
   
-  dxldy = 0;
-  dxhdy = 0;
-  dxmdy = 0;
-
-  
   s    = lewdata[5] & 0xffff0000;
   t    = (lewdata[5] & 0xffff) << 16;
-  w    = 0;
   dsdx = (lewdata[7] & 0xffff0000) | ((lewdata[6] >> 16) & 0xffff);
   dtdx = ((lewdata[7] << 16) & 0xffff0000)  | (lewdata[6] & 0xffff);
-  dsde = 0;
   dtde = (lewdata[9] & 0xffff) << 16;
-  dsdy = 0;
-  dtdy = (lewdata[8] & 0xffff) << 16;
 
   spans[SPAN_DS] = dsdx & ~0x1f;
   spans[SPAN_DT] = dtdx & ~0x1f;
   spans[SPAN_DW] = 0;
-
-  
-  
-
-  
   
   xright = xh & ~0x1;
   xleft = xm & ~0x1;
     
   int k = 0;
-
-  int sign_dxhdy = 0;
-
-  int do_offset = 0;
-
-  int xfrac = 0;
-
-
-
-
-
 
 #define ADJUST_ATTR_LOAD()                    \
 {                               \
@@ -5997,12 +5862,10 @@ static void edgewalker_for_loads(int32_t* lewdata)
   int ylfar = yl | 3;
   
   int valid_y = 1;
-  int length = 0;
-  int32_t xrsc = 0, xlsc = 0, stickybit = 0;
+  int32_t xrsc = 0, xlsc = 0;
   int32_t yllimit = yl;
   int32_t yhlimit = yh;
 
-  xfrac = 0;
   xend = xright >> 16;
 
   
@@ -6136,343 +5999,6 @@ static const uint32_t rdp_command_length[64] =
   8,      
   8     
 };
-
-static int rdp_dasm(char *buffer)
-{
-  int tile;
-  const char *format, *size;
-  char sl[32], tl[32], sh[32], th[32];
-  char s[32], t[32];
-  char dsdx[32], dtdy[32];
-#if DETAILED_LOGGING
-  int i;
-  char dtdx[32], dwdx[32];
-  char dsdy[32], dwdy[32];
-  char dsde[32], dtde[32], dwde[32];
-  char yl[32], yh[32], ym[32], xl[32], xh[32], xm[32];
-  char dxldy[32], dxhdy[32], dxmdy[32];
-  char rt[32], gt[32], bt[32], at[32];
-  char drdx[32], dgdx[32], dbdx[32], dadx[32];
-  char drdy[32], dgdy[32], dbdy[32], dady[32];
-  char drde[32], dgde[32], dbde[32], dade[32];
-#endif
-  uint32_t r,g,b,a;
-
-  uint32_t cmd[64];
-  uint32_t length;
-  uint32_t command;
-
-  length = rdp_cmd_ptr * 4;
-  if (length < 8)
-  {
-    sprintf(buffer, "ERROR: length = %d\n", length);
-    return 0;
-  }
-
-  cmd[0] = rdp_cmd_data[rdp_cmd_cur+0];
-  cmd[1] = rdp_cmd_data[rdp_cmd_cur+1];
-
-  tile = (cmd[1] >> 24) & 0x7;
-  sprintf(sl, "%4.2f", (float)((cmd[0] >> 12) & 0xfff) / 4.0f);
-  sprintf(tl, "%4.2f", (float)((cmd[0] >>  0) & 0xfff) / 4.0f);
-  sprintf(sh, "%4.2f", (float)((cmd[1] >> 12) & 0xfff) / 4.0f);
-  sprintf(th, "%4.2f", (float)((cmd[1] >>  0) & 0xfff) / 4.0f);
-
-  format = image_format[(cmd[0] >> 21) & 0x7];
-  size = image_size[(cmd[0] >> 19) & 0x3];
-
-  r = (cmd[1] >> 24) & 0xff;
-  g = (cmd[1] >> 16) & 0xff;
-  b = (cmd[1] >>  8) & 0xff;
-  a = (cmd[1] >>  0) & 0xff;
-
-  command = (cmd[0] >> 24) & 0x3f;
-  switch (command)
-  {
-    case 0x00:  sprintf(buffer, "No Op"); break;
-    case 0x08:
-      sprintf(buffer, "Tri_NoShade (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0a:
-      sprintf(buffer, "Tri_Tex (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0c:
-      sprintf(buffer, "Tri_Shade (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0e:
-      sprintf(buffer, "Tri_TexShade (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x09:
-      sprintf(buffer, "TriZ_NoShade (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0b:
-      sprintf(buffer, "TriZ_Tex (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0d:
-      sprintf(buffer, "TriZ_Shade (%08X %08X)", cmd[0], cmd[1]); break;
-    case 0x0f:
-      sprintf(buffer, "TriZ_TexShade (%08X %08X)", cmd[0], cmd[1]); break;
-#if DETAILED_LOGGING
-    case 0x08:    
-    {
-      int lft = (command >> 23) & 0x1;
-
-      if (length != rdp_command_length[command])
-      {
-        sprintf(buffer, "ERROR: Tri_NoShade length = %d\n", length);
-        return 0;
-      }
-
-      cmd[2] = rdp_cmd_data[rdp_cmd_cur+2];
-      cmd[3] = rdp_cmd_data[rdp_cmd_cur+3];
-      cmd[4] = rdp_cmd_data[rdp_cmd_cur+4];
-      cmd[5] = rdp_cmd_data[rdp_cmd_cur+5];
-      cmd[6] = rdp_cmd_data[rdp_cmd_cur+6];
-      cmd[7] = rdp_cmd_data[rdp_cmd_cur+7];
-
-      sprintf(yl,   "%4.4f", (float)((cmd[0] >>  0) & 0x1fff) / 4.0f);
-      sprintf(ym,   "%4.4f", (float)((cmd[1] >> 16) & 0x1fff) / 4.0f);
-      sprintf(yh,   "%4.4f", (float)((cmd[1] >>  0) & 0x1fff) / 4.0f);
-      sprintf(xl,   "%4.4f", (float)(cmd[2] / 65536.0f));
-      sprintf(dxldy,  "%4.4f", (float)(cmd[3] / 65536.0f));
-      sprintf(xh,   "%4.4f", (float)(cmd[4] / 65536.0f));
-      sprintf(dxhdy,  "%4.4f", (float)(cmd[5] / 65536.0f));
-      sprintf(xm,   "%4.4f", (float)(cmd[6] / 65536.0f));
-      sprintf(dxmdy,  "%4.4f", (float)(cmd[7] / 65536.0f));
-
-          sprintf(buffer, "Tri_NoShade            %d, XL: %s, XM: %s, XH: %s, YL: %s, YM: %s, YH: %s\n", lft, xl,xm,xh,yl,ym,yh);
-      break;
-    }
-    case 0x0a:    
-    {
-      int lft = (command >> 23) & 0x1;
-
-      if (length < rdp_command_length[command])
-      {
-        sprintf(buffer, "ERROR: Tri_Tex length = %d\n", length);
-        return 0;
-      }
-
-      for (i=2; i < 24; i++)
-      {
-        cmd[i] = rdp_cmd_data[rdp_cmd_cur+i];
-      }
-
-      sprintf(yl,   "%4.4f", (float)((cmd[0] >>  0) & 0x1fff) / 4.0f);
-      sprintf(ym,   "%4.4f", (float)((cmd[1] >> 16) & 0x1fff) / 4.0f);
-      sprintf(yh,   "%4.4f", (float)((cmd[1] >>  0) & 0x1fff) / 4.0f);
-      sprintf(xl,   "%4.4f", (float)((int32_t)cmd[2] / 65536.0f));
-      sprintf(dxldy,  "%4.4f", (float)((int32_t)cmd[3] / 65536.0f));
-      sprintf(xh,   "%4.4f", (float)((int32_t)cmd[4] / 65536.0f));
-      sprintf(dxhdy,  "%4.4f", (float)((int32_t)cmd[5] / 65536.0f));
-      sprintf(xm,   "%4.4f", (float)((int32_t)cmd[6] / 65536.0f));
-      sprintf(dxmdy,  "%4.4f", (float)((int32_t)cmd[7] / 65536.0f));
-
-      sprintf(s,    "%4.4f", (float)(int32_t)((cmd[ 8] & 0xffff0000) | ((cmd[12] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(t,    "%4.4f", (float)(int32_t)(((cmd[ 8] & 0xffff) << 16) | (cmd[12] & 0xffff)) / 65536.0f);
-      sprintf(w,    "%4.4f", (float)(int32_t)((cmd[ 9] & 0xffff0000) | ((cmd[13] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsdx, "%4.4f", (float)(int32_t)((cmd[10] & 0xffff0000) | ((cmd[14] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtdx, "%4.4f", (float)(int32_t)(((cmd[10] & 0xffff) << 16) | (cmd[14] & 0xffff)) / 65536.0f);
-      sprintf(dwdx, "%4.4f", (float)(int32_t)((cmd[11] & 0xffff0000) | ((cmd[15] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsde, "%4.4f", (float)(int32_t)((cmd[16] & 0xffff0000) | ((cmd[20] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtde, "%4.4f", (float)(int32_t)(((cmd[16] & 0xffff) << 16) | (cmd[20] & 0xffff)) / 65536.0f);
-      sprintf(dwde, "%4.4f", (float)(int32_t)((cmd[17] & 0xffff0000) | ((cmd[21] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsdy, "%4.4f", (float)(int32_t)((cmd[18] & 0xffff0000) | ((cmd[22] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtdy, "%4.4f", (float)(int32_t)(((cmd[18] & 0xffff) << 16) | (cmd[22] & 0xffff)) / 65536.0f);
-      sprintf(dwdy, "%4.4f", (float)(int32_t)((cmd[19] & 0xffff0000) | ((cmd[23] >> 16) & 0xffff)) / 65536.0f);
-
-
-      buffer+=sprintf(buffer, "Tri_Tex               %d, XL: %s, XM: %s, XH: %s, YL: %s, YM: %s, YH: %s\n", lft, xl,xm,xh,yl,ym,yh);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       S: %s, T: %s, W: %s\n", s, t, w);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDX: %s, DTDX: %s, DWDX: %s\n", dsdx, dtdx, dwdx);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDE: %s, DTDE: %s, DWDE: %s\n", dsde, dtde, dwde);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDY: %s, DTDY: %s, DWDY: %s\n", dsdy, dtdy, dwdy);
-      break;
-    }
-    case 0x0c:    
-    {
-      int lft = (command >> 23) & 0x1;
-
-      if (length != rdp_command_length[command])
-      {
-        sprintf(buffer, "ERROR: Tri_Shade length = %d\n", length);
-        return 0;
-      }
-
-      for (i=2; i < 24; i++)
-      {
-        cmd[i] = rdp_cmd_data[i];
-      }
-
-      sprintf(yl,   "%4.4f", (float)((cmd[0] >>  0) & 0x1fff) / 4.0f);
-      sprintf(ym,   "%4.4f", (float)((cmd[1] >> 16) & 0x1fff) / 4.0f);
-      sprintf(yh,   "%4.4f", (float)((cmd[1] >>  0) & 0x1fff) / 4.0f);
-      sprintf(xl,   "%4.4f", (float)((int32_t)cmd[2] / 65536.0f));
-      sprintf(dxldy,  "%4.4f", (float)((int32_t)cmd[3] / 65536.0f));
-      sprintf(xh,   "%4.4f", (float)((int32_t)cmd[4] / 65536.0f));
-      sprintf(dxhdy,  "%4.4f", (float)((int32_t)cmd[5] / 65536.0f));
-      sprintf(xm,   "%4.4f", (float)((int32_t)cmd[6] / 65536.0f));
-      sprintf(dxmdy,  "%4.4f", (float)((int32_t)cmd[7] / 65536.0f));
-      sprintf(rt,   "%4.4f", (float)(int32_t)((cmd[8] & 0xffff0000) | ((cmd[12] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(gt,   "%4.4f", (float)(int32_t)(((cmd[8] & 0xffff) << 16) | (cmd[12] & 0xffff)) / 65536.0f);
-      sprintf(bt,   "%4.4f", (float)(int32_t)((cmd[9] & 0xffff0000) | ((cmd[13] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(at,   "%4.4f", (float)(int32_t)(((cmd[9] & 0xffff) << 16) | (cmd[13] & 0xffff)) / 65536.0f);
-      sprintf(drdx, "%4.4f", (float)(int32_t)((cmd[10] & 0xffff0000) | ((cmd[14] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgdx, "%4.4f", (float)(int32_t)(((cmd[10] & 0xffff) << 16) | (cmd[14] & 0xffff)) / 65536.0f);
-      sprintf(dbdx, "%4.4f", (float)(int32_t)((cmd[11] & 0xffff0000) | ((cmd[15] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dadx, "%4.4f", (float)(int32_t)(((cmd[11] & 0xffff) << 16) | (cmd[15] & 0xffff)) / 65536.0f);
-      sprintf(drde, "%4.4f", (float)(int32_t)((cmd[16] & 0xffff0000) | ((cmd[20] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgde, "%4.4f", (float)(int32_t)(((cmd[16] & 0xffff) << 16) | (cmd[20] & 0xffff)) / 65536.0f);
-      sprintf(dbde, "%4.4f", (float)(int32_t)((cmd[17] & 0xffff0000) | ((cmd[21] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dade, "%4.4f", (float)(int32_t)(((cmd[17] & 0xffff) << 16) | (cmd[21] & 0xffff)) / 65536.0f);
-      sprintf(drdy, "%4.4f", (float)(int32_t)((cmd[18] & 0xffff0000) | ((cmd[22] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgdy, "%4.4f", (float)(int32_t)(((cmd[18] & 0xffff) << 16) | (cmd[22] & 0xffff)) / 65536.0f);
-      sprintf(dbdy, "%4.4f", (float)(int32_t)((cmd[19] & 0xffff0000) | ((cmd[23] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dady, "%4.4f", (float)(int32_t)(((cmd[19] & 0xffff) << 16) | (cmd[23] & 0xffff)) / 65536.0f);
-
-      buffer+=sprintf(buffer, "Tri_Shade              %d, XL: %s, XM: %s, XH: %s, YL: %s, YM: %s, YH: %s\n", lft, xl,xm,xh,yl,ym,yh);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       R: %s, G: %s, B: %s, A: %s\n", rt, gt, bt, at);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDX: %s, DGDX: %s, DBDX: %s, DADX: %s\n", drdx, dgdx, dbdx, dadx);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDE: %s, DGDE: %s, DBDE: %s, DADE: %s\n", drde, dgde, dbde, dade);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDY: %s, DGDY: %s, DBDY: %s, DADY: %s\n", drdy, dgdy, dbdy, dady);
-      break;
-    }
-    case 0x0e:    
-    {
-      int lft = (command >> 23) & 0x1;
-
-      if (length < rdp_command_length[command])
-      {
-        sprintf(buffer, "ERROR: Tri_TexShade length = %d\n", length);
-        return 0;
-      }
-
-      for (i=2; i < 40; i++)
-      {
-        cmd[i] = rdp_cmd_data[rdp_cmd_cur+i];
-      }
-
-      sprintf(yl,   "%4.4f", (float)((cmd[0] >>  0) & 0x1fff) / 4.0f);
-      sprintf(ym,   "%4.4f", (float)((cmd[1] >> 16) & 0x1fff) / 4.0f);
-      sprintf(yh,   "%4.4f", (float)((cmd[1] >>  0) & 0x1fff) / 4.0f);
-      sprintf(xl,   "%4.4f", (float)((int32_t)cmd[2] / 65536.0f));
-      sprintf(dxldy,  "%4.4f", (float)((int32_t)cmd[3] / 65536.0f));
-      sprintf(xh,   "%4.4f", (float)((int32_t)cmd[4] / 65536.0f));
-      sprintf(dxhdy,  "%4.4f", (float)((int32_t)cmd[5] / 65536.0f));
-      sprintf(xm,   "%4.4f", (float)((int32_t)cmd[6] / 65536.0f));
-      sprintf(dxmdy,  "%4.4f", (float)((int32_t)cmd[7] / 65536.0f));
-      sprintf(rt,   "%4.4f", (float)(int32_t)((cmd[8] & 0xffff0000) | ((cmd[12] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(gt,   "%4.4f", (float)(int32_t)(((cmd[8] & 0xffff) << 16) | (cmd[12] & 0xffff)) / 65536.0f);
-      sprintf(bt,   "%4.4f", (float)(int32_t)((cmd[9] & 0xffff0000) | ((cmd[13] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(at,   "%4.4f", (float)(int32_t)(((cmd[9] & 0xffff) << 16) | (cmd[13] & 0xffff)) / 65536.0f);
-      sprintf(drdx, "%4.4f", (float)(int32_t)((cmd[10] & 0xffff0000) | ((cmd[14] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgdx, "%4.4f", (float)(int32_t)(((cmd[10] & 0xffff) << 16) | (cmd[14] & 0xffff)) / 65536.0f);
-      sprintf(dbdx, "%4.4f", (float)(int32_t)((cmd[11] & 0xffff0000) | ((cmd[15] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dadx, "%4.4f", (float)(int32_t)(((cmd[11] & 0xffff) << 16) | (cmd[15] & 0xffff)) / 65536.0f);
-      sprintf(drde, "%4.4f", (float)(int32_t)((cmd[16] & 0xffff0000) | ((cmd[20] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgde, "%4.4f", (float)(int32_t)(((cmd[16] & 0xffff) << 16) | (cmd[20] & 0xffff)) / 65536.0f);
-      sprintf(dbde, "%4.4f", (float)(int32_t)((cmd[17] & 0xffff0000) | ((cmd[21] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dade, "%4.4f", (float)(int32_t)(((cmd[17] & 0xffff) << 16) | (cmd[21] & 0xffff)) / 65536.0f);
-      sprintf(drdy, "%4.4f", (float)(int32_t)((cmd[18] & 0xffff0000) | ((cmd[22] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dgdy, "%4.4f", (float)(int32_t)(((cmd[18] & 0xffff) << 16) | (cmd[22] & 0xffff)) / 65536.0f);
-      sprintf(dbdy, "%4.4f", (float)(int32_t)((cmd[19] & 0xffff0000) | ((cmd[23] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dady, "%4.4f", (float)(int32_t)(((cmd[19] & 0xffff) << 16) | (cmd[23] & 0xffff)) / 65536.0f);
-
-      sprintf(s,    "%4.4f", (float)(int32_t)((cmd[24] & 0xffff0000) | ((cmd[28] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(t,    "%4.4f", (float)(int32_t)(((cmd[24] & 0xffff) << 16) | (cmd[28] & 0xffff)) / 65536.0f);
-      sprintf(w,    "%4.4f", (float)(int32_t)((cmd[25] & 0xffff0000) | ((cmd[29] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsdx, "%4.4f", (float)(int32_t)((cmd[26] & 0xffff0000) | ((cmd[30] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtdx, "%4.4f", (float)(int32_t)(((cmd[26] & 0xffff) << 16) | (cmd[30] & 0xffff)) / 65536.0f);
-      sprintf(dwdx, "%4.4f", (float)(int32_t)((cmd[27] & 0xffff0000) | ((cmd[31] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsde, "%4.4f", (float)(int32_t)((cmd[32] & 0xffff0000) | ((cmd[36] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtde, "%4.4f", (float)(int32_t)(((cmd[32] & 0xffff) << 16) | (cmd[36] & 0xffff)) / 65536.0f);
-      sprintf(dwde, "%4.4f", (float)(int32_t)((cmd[33] & 0xffff0000) | ((cmd[37] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dsdy, "%4.4f", (float)(int32_t)((cmd[34] & 0xffff0000) | ((cmd[38] >> 16) & 0xffff)) / 65536.0f);
-      sprintf(dtdy, "%4.4f", (float)(int32_t)(((cmd[34] & 0xffff) << 16) | (cmd[38] & 0xffff)) / 65536.0f);
-      sprintf(dwdy, "%4.4f", (float)(int32_t)((cmd[35] & 0xffff0000) | ((cmd[39] >> 16) & 0xffff)) / 65536.0f);
-
-
-      buffer+=sprintf(buffer, "Tri_TexShade           %d, XL: %s, XM: %s, XH: %s, YL: %s, YM: %s, YH: %s\n", lft, xl,xm,xh,yl,ym,yh);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       R: %s, G: %s, B: %s, A: %s\n", rt, gt, bt, at);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDX: %s, DGDX: %s, DBDX: %s, DADX: %s\n", drdx, dgdx, dbdx, dadx);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDE: %s, DGDE: %s, DBDE: %s, DADE: %s\n", drde, dgde, dbde, dade);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DRDY: %s, DGDY: %s, DBDY: %s, DADY: %s\n", drdy, dgdy, dbdy, dady);
-
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       S: %s, T: %s, W: %s\n", s, t, w);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDX: %s, DTDX: %s, DWDX: %s\n", dsdx, dtdx, dwdx);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDE: %s, DTDE: %s, DWDE: %s\n", dsde, dtde, dwde);
-      buffer+=sprintf(buffer, "                              ");
-      buffer+=sprintf(buffer, "                       DSDY: %s, DTDY: %s, DWDY: %s\n", dsdy, dtdy, dwdy);
-      break;
-    }
-#endif
-    case 0x24: 
-    case 0x25:
-    {
-      if (length < 16)
-      {
-        sprintf(buffer, "ERROR: Texture_Rectangle length = %d\n", length);
-        return 0;
-      }
-      cmd[2] = rdp_cmd_data[rdp_cmd_cur+2];
-      cmd[3] = rdp_cmd_data[rdp_cmd_cur+3];
-      sprintf(s,    "%4.4f", (float)(int16_t)((cmd[2] >> 16) & 0xffff) / 32.0f);
-      sprintf(t,    "%4.4f", (float)(int16_t)((cmd[2] >>  0) & 0xffff) / 32.0f);
-      sprintf(dsdx, "%4.4f", (float)(int16_t)((cmd[3] >> 16) & 0xffff) / 1024.0f);
-      sprintf(dtdy, "%4.4f", (float)(int16_t)((cmd[3] >> 16) & 0xffff) / 1024.0f);
-
-      if (command == 0x24)
-          sprintf(buffer, "Texture_Rectangle      %d, %s, %s, %s, %s,  %s, %s, %s, %s", tile, sh, th, sl, tl, s, t, dsdx, dtdy);
-      else
-          sprintf(buffer, "Texture_Rectangle_Flip %d, %s, %s, %s, %s,  %s, %s, %s, %s", tile, sh, th, sl, tl, s, t, dsdx, dtdy);
-
-      break;
-    }
-    case 0x26:  sprintf(buffer, "Sync_Load"); break;
-    case 0x27:  sprintf(buffer, "Sync_Pipe"); break;
-    case 0x28:  sprintf(buffer, "Sync_Tile"); break;
-    case 0x29:  sprintf(buffer, "Sync_Full"); break;
-    case 0x2a:  sprintf(buffer, "Set_Key_GB"); break;
-    case 0x2b:  sprintf(buffer, "Set_Key_R"); break;
-    case 0x2c:  sprintf(buffer, "Set_Convert"); break;
-    case 0x2d:  sprintf(buffer, "Set_Scissor            %s, %s, %s, %s", sl, tl, sh, th); break;
-    case 0x2e:  sprintf(buffer, "Set_Prim_Depth         %04X, %04X", (cmd[1] >> 16) & 0xffff, cmd[1] & 0xffff); break;
-    case 0x2f:  sprintf(buffer, "Set_Other_Modes        %08X %08X", cmd[0], cmd[1]); break;
-    case 0x30:  sprintf(buffer, "Load_TLUT              %d, %s, %s, %s, %s", tile, sl, tl, sh, th); break;
-    case 0x32:  sprintf(buffer, "Set_Tile_Size          %d, %s, %s, %s, %s", tile, sl, tl, sh, th); break;
-    case 0x33:  sprintf(buffer, "Load_Block             %d, %03X, %03X, %03X, %03X", tile, (cmd[0] >> 12) & 0xfff, cmd[0] & 0xfff, (cmd[1] >> 12) & 0xfff, cmd[1] & 0xfff); break;
-    case 0x34:  sprintf(buffer, "Load_Tile              %d, %s, %s, %s, %s", tile, sl, tl, sh, th); break;
-    case 0x35:  sprintf(buffer, "Set_Tile               %d, %s, %s, %d, %04X", tile, format, size, ((cmd[0] >> 9) & 0x1ff) * 8, (cmd[0] & 0x1ff) * 8); break;
-    case 0x36:  sprintf(buffer, "Fill_Rectangle         %s, %s, %s, %s", sh, th, sl, tl); break;
-    case 0x37:  sprintf(buffer, "Set_Fill_Color         R: %d, G: %d, B: %d, A: %d", r, g, b, a); break;
-    case 0x38:  sprintf(buffer, "Set_Fog_Color          R: %d, G: %d, B: %d, A: %d", r, g, b, a); break;
-    case 0x39:  sprintf(buffer, "Set_Blend_Color        R: %d, G: %d, B: %d, A: %d", r, g, b, a); break;
-    case 0x3a:  sprintf(buffer, "Set_Prim_Color         %d, %d, R: %d, G: %d, B: %d, A: %d", (cmd[0] >> 8) & 0x1f, cmd[0] & 0xff, r, g, b, a); break;
-    case 0x3b:  sprintf(buffer, "Set_Env_Color          R: %d, G: %d, B: %d, A: %d", r, g, b, a); break;
-    case 0x3c:  sprintf(buffer, "Set_Combine            %08X %08X", cmd[0], cmd[1]); break;
-    case 0x3d:  sprintf(buffer, "Set_Texture_Image      %s, %s, %d, %08X", format, size, (cmd[0] & 0x1ff)+1, cmd[1]); break;
-    case 0x3e:  sprintf(buffer, "Set_Mask_Image         %08X", cmd[1]); break;
-    case 0x3f:  sprintf(buffer, "Set_Color_Image        %s, %s, %d, %08X", format, size, (cmd[0] & 0x1ff)+1, cmd[1]); break;
-    default:  sprintf(buffer, "Unknown command 0x%06X (%08X %08X)", command, cmd[0], cmd[1]); break;
-  }
-
-  return rdp_command_length[command];
-}
-
-
-
-
-
-
 
 static void rdp_invalid(uint32_t w1, uint32_t w2)
 {
@@ -6823,7 +6349,6 @@ void deduce_derivatives()
 
   
   int texel1_used_in_cc1 = 0, texel0_used_in_cc1 = 0, texel0_used_in_cc0 = 0, texel1_used_in_cc0 = 0;
-  int texels_in_cc0 = 0, texels_in_cc1 = 0;
   int lod_frac_used_in_cc1 = 0, lod_frac_used_in_cc0 = 0;
 
   if ((combiner_rgbmul_r[1] == &lod_frac) || (combiner_alphamul[1] == &lod_frac))
@@ -6847,9 +6372,6 @@ void deduce_derivatives()
     combiner_alphamul[0] == &texel0_color.a || combiner_alphasub_a[0] == &texel0_color.a || combiner_alphasub_b[0] == &texel0_color.a || combiner_alphaadd[0] == &texel0_color.a || \
     combiner_rgbmul_r[0] == &texel0_color.a)
     texel0_used_in_cc0 = 1;
-  texels_in_cc0 = texel0_used_in_cc0 || texel1_used_in_cc0;
-  texels_in_cc1 = texel0_used_in_cc1 || texel1_used_in_cc1; 
-
   
   if (texel1_used_in_cc1)
     render_spans_1cycle_ptr = render_spans_1cycle_func[2];
@@ -7240,25 +6762,6 @@ void RDPProcessList(struct RDP *rdp)
       my_rdp->regs[DPC_START_REG] = my_rdp->regs[DPC_CURRENT_REG] = my_rdp->regs[DPC_END_REG];
       return;
     }
-    
-    if (LOG_RDP_EXECUTION)
-    {
-      char string[4000];
-      if (1)
-      {
-      z64gl_command += cmd_length;
-      
-      
-      rdp_dasm(string);
-      fprintf(rdp_exec, "%08X: %08X %08X   %s\n", command_counter, rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur+1], string);
-      }
-      command_counter++;
-    }
-
-    
-    
-    
-
     
     rdp_command_table[cmd](rdp_cmd_data[rdp_cmd_cur+0], rdp_cmd_data[rdp_cmd_cur + 1]);
     
@@ -8196,432 +7699,6 @@ static int32_t CLIP(int32_t value,int32_t min,int32_t max)
     return value;
 }
 
-
-static void video_filter16(int* endr, int* endg, int* endb, uint32_t fboffset, uint32_t num, uint32_t hres, uint32_t centercvg)
-{
-
-
-
-
-
-  uint32_t penumaxr, penumaxg, penumaxb, penuminr, penuming, penuminb;
-  uint16_t pix;
-  uint32_t numoffull = 1;
-  uint32_t hidval;
-  uint32_t r, g, b; 
-  uint32_t backr[7], backg[7], backb[7];
-  uint32_t invr[7], invg[7], invb[7];
-
-  r = *endr;
-  g = *endg;
-  b = *endb;
-
-  backr[0] = r;
-  backg[0] = g;
-  backb[0] = b;
-  invr[0] = (~r) & 0xff;
-  invg[0] = (~g) & 0xff;
-  invb[0] = (~b) & 0xff;
-
-  
-  
-
-  
-  uint32_t idx = (fboffset >> 1) + num;
-  uint32_t leftup = idx - hres - 1;
-  uint32_t rightup = idx - hres + 1;
-  uint32_t toleft = idx - 2;
-  uint32_t toright = idx + 2;
-  uint32_t leftdown = idx + hres - 1;
-  uint32_t rightdown = idx + hres + 1;
-
-
-#define VI_ANDER(x) {                         \
-      PAIRREAD16(pix, hidval, x);                 \
-      if (hidval == 3 && (pix & 1))               \
-      {                             \
-        backr[numoffull] = GET_HI(pix);             \
-        backg[numoffull] = GET_MED(pix);            \
-        backb[numoffull] = GET_LOW(pix);            \
-        invr[numoffull] = (~backr[numoffull]) & 0xff;     \
-        invg[numoffull] = (~backg[numoffull]) & 0xff;     \
-        invb[numoffull] = (~backb[numoffull]) & 0xff;     \
-      }                             \
-      else                            \
-      {                             \
-                backr[numoffull] = invr[numoffull] = 0; \
-        backg[numoffull] = invg[numoffull] = 0;         \
-        backb[numoffull] = invb[numoffull] = 0;         \
-      }                             \
-      numoffull++;                        \
-}
-  
-  VI_ANDER(leftup);
-  VI_ANDER(rightup);
-  VI_ANDER(toleft);
-  VI_ANDER(toright);
-  VI_ANDER(leftdown);
-  VI_ANDER(rightdown);
-
-  uint32_t colr, colg, colb;
-
-  video_max_optimized(&backr[0], &penumaxr);
-  video_max_optimized(&backg[0], &penumaxg);
-  video_max_optimized(&backb[0], &penumaxb);
-  video_max_optimized(&invr[0], &penuminr);
-  video_max_optimized(&invg[0], &penuming);
-  video_max_optimized(&invb[0], &penuminb);
-
-  penuminr = (~penuminr) & 0xff;
-  penuming = (~penuming) & 0xff;
-  penuminb = (~penuminb) & 0xff;
-
-  
-  
-  uint32_t coeff = 7 - centercvg;
-  colr = penuminr + penumaxr - (r << 1);
-  colg = penuming + penumaxg - (g << 1);
-  colb = penuminb + penumaxb - (b << 1);
-
-  colr = (((colr * coeff) + 4) >> 3) + r;
-  colg = (((colg * coeff) + 4) >> 3) + g;
-  colb = (((colb * coeff) + 4) >> 3) + b;
-
-  *endr = colr & 0xff;
-  *endg = colg & 0xff;
-  *endb = colb & 0xff;
-
-  
-  
-}
-
-static void video_filter32(int* endr, int* endg, int* endb, uint32_t fboffset, uint32_t num, uint32_t hres, uint32_t centercvg)
-{
-
-  uint32_t penumaxr, penumaxg, penumaxb, penuminr, penuming, penuminb;
-  uint32_t numoffull = 1;
-  uint32_t pix = 0, pixcvg = 0;
-  uint32_t r, g, b; 
-  uint32_t backr[7], backg[7], backb[7];
-  uint32_t invr[7], invg[7], invb[7];
-
-  r = *endr;
-  g = *endg;
-  b = *endb;
-
-  backr[0] = r;
-  backg[0] = g;
-  backb[0] = b;
-  invr[0] = (~r) & 0xff;
-  invg[0] = (~g) & 0xff;
-  invb[0] = (~b) & 0xff;
-
-  uint32_t idx = (fboffset >> 2) + num;
-  uint32_t leftup = idx - hres - 1;
-  uint32_t rightup = idx - hres + 1;
-  uint32_t toleft = idx - 2;
-  uint32_t toright = idx + 2;
-  uint32_t leftdown = idx + hres - 1;
-  uint32_t rightdown = idx + hres + 1;
-
-#define VI_ANDER32(x) {                         \
-      pix = RREADIDX32(x);                    \
-      pixcvg = (pix >> 5) & 7;                  \
-      if (pixcvg == 7)                      \
-      {                             \
-        backr[numoffull] = (pix >> 24) & 0xff;          \
-        backg[numoffull] = (pix >> 16) & 0xff;          \
-        backb[numoffull] = (pix >> 8) & 0xff;         \
-        invr[numoffull] = (~backr[numoffull]) & 0xff;     \
-        invg[numoffull] = (~backg[numoffull]) & 0xff;     \
-        invb[numoffull] = (~backb[numoffull]) & 0xff;     \
-      }                             \
-      else                            \
-      {                             \
-                backr[numoffull] = invr[numoffull] = 0;         \
-        backg[numoffull] = invg[numoffull] = 0;         \
-        backb[numoffull] = invb[numoffull] = 0;         \
-      }                             \
-      numoffull++;                        \
-}
-  
-  VI_ANDER32(leftup);
-  VI_ANDER32(rightup);
-  VI_ANDER32(toleft);
-  VI_ANDER32(toright);
-  VI_ANDER32(leftdown);
-  VI_ANDER32(rightdown);
-
-  uint32_t colr, colg, colb;
-
-  video_max_optimized(&backr[0], &penumaxr);
-  video_max_optimized(&backg[0], &penumaxg);
-  video_max_optimized(&backb[0], &penumaxb);
-  video_max_optimized(&invr[0], &penuminr);
-  video_max_optimized(&invg[0], &penuming);
-  video_max_optimized(&invb[0], &penuminb);
-
-  penuminr = (~penuminr) & 0xff;
-  penuming = (~penuming) & 0xff;
-  penuminb = (~penuminb) & 0xff;
-
-  uint32_t coeff = 7 - centercvg;
-  colr = penuminr + penumaxr - (r << 1);
-  colg = penuming + penumaxg - (g << 1);
-  colb = penuminb + penumaxb - (b << 1);
-
-  colr = (((colr * coeff) + 4) >> 3) + r;
-  colg = (((colg * coeff) + 4) >> 3) + g;
-  colb = (((colb * coeff) + 4) >> 3) + b;
-
-  *endr = colr & 0xff;
-  *endg = colg & 0xff;
-  *endb = colb & 0xff;
-}
-
-static void divot_filter(CCVG* final, CCVG centercolor, CCVG leftcolor, CCVG rightcolor)
-{
-
-
-
-
-
-  uint32_t leftr, leftg, leftb, rightr, rightg, rightb, centerr, centerg, centerb;
-
-  *final = centercolor;
-  
-  if ((centercolor.cvg & leftcolor.cvg & rightcolor.cvg) == 7)
-  
-  
-  
-  {
-    return;
-  }
-
-  leftr = leftcolor.r;  
-  leftg = leftcolor.g;  
-  leftb = leftcolor.b;
-  rightr = rightcolor.r;  
-  rightg = rightcolor.g;  
-  rightb = rightcolor.b;
-  centerr = centercolor.r;
-  centerg = centercolor.g;
-  centerb = centercolor.b;
-
-
-  if ((leftr >= centerr && rightr >= leftr) || (leftr >= rightr && centerr >= leftr))
-    final->r = leftr;
-  else if ((rightr >= centerr && leftr >= rightr) || (rightr >= leftr && centerr >= rightr))
-    final->r = rightr;
-
-  if ((leftg >= centerg && rightg >= leftg) || (leftg >= rightg && centerg >= leftg))
-    final->g = leftg;
-  else if ((rightg >= centerg && leftg >= rightg) || (rightg >= leftg && centerg >= rightg))
-    final->g = rightg;
-
-  if ((leftb >= centerb && rightb >= leftb) || (leftb >= rightb && centerb >= leftb))
-    final->b = leftb;
-  else if ((rightb >= centerb && leftb >= rightb) || (rightb >= leftb && centerb >= rightb))
-    final->b = rightb;
-}
-
-static void restore_filter16(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres)
-{
-
-
-  uint32_t idx = (fboffset >> 1) + num;
-  uint32_t leftuppix = idx - hres - 1;
-  uint32_t leftdownpix = idx + hres - 1;
-  uint32_t toleftpix = idx - 1;
-
-  uint32_t rend = *r;
-  uint32_t gend = *g;
-  uint32_t bend = *b;
-  uint32_t rcomp = (rend >> 3) & 0x1f;
-  uint32_t gcomp = (gend >> 3) & 0x1f;
-  uint32_t bcomp = (bend >> 3) & 0x1f;
-
-  uint32_t tempr, tempg, tempb;
-  uint16_t pix;
-
-
-#define VI_COMPARE(x)                       \
-{                                 \
-  pix = RREADIDX16((x));                      \
-  tempr = (pix >> 6) & 0x3e0;                   \
-  tempg = (pix >> 1) & 0x3e0;                   \
-  tempb = (pix << 4) & 0x3e0;                   \
-  rend += vi_restore_table[tempr | rcomp];            \
-  gend += vi_restore_table[tempg | gcomp];            \
-  bend += vi_restore_table[tempb | bcomp];            \
-}
-
-  VI_COMPARE(leftuppix);
-  VI_COMPARE(leftuppix + 1);
-  VI_COMPARE(leftuppix + 2);
-  VI_COMPARE(leftdownpix);
-  VI_COMPARE(leftdownpix + 1);
-  VI_COMPARE(leftdownpix + 2);
-  VI_COMPARE(toleftpix);
-  VI_COMPARE(toleftpix + 2);
-
-  
-  *r = rend;
-  *g = gend;
-  *b = bend;
-}
-
-static void restore_filter32(int* r, int* g, int* b, uint32_t fboffset, uint32_t num, uint32_t hres)
-{
-  uint32_t idx = (fboffset >> 2) + num;
-  uint32_t leftuppix = idx - hres - 1;
-  uint32_t leftdownpix = idx + hres - 1;
-  uint32_t toleftpix = idx - 1;
-
-  uint32_t rend = *r;
-  uint32_t gend = *g;
-  uint32_t bend = *b;
-  uint32_t rcomp = (rend >> 3) & 0x1f;
-  uint32_t gcomp = (gend >> 3) & 0x1f;
-  uint32_t bcomp = (bend >> 3) & 0x1f;
-
-  uint32_t tempr, tempg, tempb;
-  uint32_t pix;
-
-#define VI_COMPARE32(x)                         \
-{                                   \
-  pix = RREADIDX32(x);                        \
-  tempr = (pix >> 19) & 0x3e0;                    \
-  tempg = (pix >> 11) & 0x3e0;                    \
-  tempb = (pix >> 3) & 0x3e0;                     \
-  rend += vi_restore_table[tempr | rcomp];              \
-  gend += vi_restore_table[tempg | gcomp];              \
-  bend += vi_restore_table[tempb | bcomp];              \
-}
-
-  VI_COMPARE32(leftuppix);
-  VI_COMPARE32(leftuppix + 1);
-  VI_COMPARE32(leftuppix + 2);
-  VI_COMPARE32(leftdownpix);
-  VI_COMPARE32(leftdownpix + 1);
-  VI_COMPARE32(leftdownpix + 2);
-  VI_COMPARE32(toleftpix);
-  VI_COMPARE32(toleftpix + 2);
-
-  *r = rend;
-  *g = gend;
-  *b = bend;
-}
-
-static void gamma_filters(int* r, int* g, int* b, int gamma_and_dither)
-{
-  int cdith, dith;
-  
-  
-
-  switch(gamma_and_dither)
-  {
-  case 0:
-    return;
-    break;
-  case 1:
-    cdith = irand();
-    dith = cdith & 1;
-    if (*r < 255)
-      *r += dith;
-    dith = (cdith >> 1) & 1;
-    if (*g < 255)
-      *g += dith;
-    dith = (cdith >> 2) & 1;
-    if (*b < 255)
-      *b += dith;
-    break;
-  case 2:
-    *r = gamma_table[*r];
-    *g = gamma_table[*g];
-    *b = gamma_table[*b];
-    break;
-  case 3:
-    cdith = irand();
-    dith = cdith & 0x3f;
-    *r = gamma_dither_table[((*r) << 6)|dith];
-    dith = (cdith >> 6) & 0x3f;
-    *g = gamma_dither_table[((*g) << 6)|dith];
-    dith = ((cdith >> 9) & 0x38) | (cdith & 7);
-    *b = gamma_dither_table[((*b) << 6)|dith];
-    break;
-  }
-}
-
-static void adjust_brightness(int* r, int* g, int* b, int brightcoeff)
-{
-  brightcoeff &= 7;
-  switch(brightcoeff)
-  {
-  case 0: 
-    break;
-  case 1: 
-  case 2:
-  case 3:
-    *r += (*r >> (4 - brightcoeff));
-    *g += (*g >> (4 - brightcoeff));
-    *b += (*b >> (4 - brightcoeff));
-    if (*r > 0xff)
-      *r = 0xff;
-    if (*g > 0xff)
-      *g = 0xff;
-    if (*b > 0xff)
-      *b = 0xff;
-    break;
-  case 4:
-  case 5:
-  case 6:
-  case 7:
-    *r = (*r + 1) << (brightcoeff - 3);
-    *g = (*g + 1) << (brightcoeff - 3);
-    *b = (*b + 1) << (brightcoeff - 3);
-    if (*r > 0xff)
-      *r = 0xff;
-    if (*g > 0xff)
-      *g = 0xff;
-    if (*b > 0xff)
-      *b = 0xff;
-    break;
-  }
-}
-
-
-static void video_max_optimized(uint32_t* Pixels, uint32_t* pen)
-{
-  int i;
-  int pos = 0;
-  uint32_t curpen = Pixels[0];
-  uint32_t max;
-  for (i = 1; i < 7; i++)
-  {
-      if (Pixels[i] > Pixels[pos])
-    {
-      curpen = Pixels[pos];
-      pos = i;      
-    }
-  }
-  max = Pixels[pos];
-  if (curpen != max)
-  {
-    for (i = pos + 1; i < 7; i++)
-    {
-      if (Pixels[i] > curpen)
-      {
-        curpen = Pixels[i];
-      }
-    }
-  }
-  *pen = curpen;
-
-  
-}
-
-
 static void calculate_clamp_diffs(uint32_t i)
 {
   tile[i].f.clampdiffs = ((tile[i].sh >> 2) - (tile[i].sl >> 2)) & 0x3ff;
@@ -8863,22 +7940,6 @@ static void get_dither_nothing(int x, int y, int* cdith, int* adith)
 {
 }
 
-static void vi_vl_lerp(CCVG* up, CCVG down, uint32_t frac)
-{
-  uint32_t r0, g0, b0;
-  if (!frac)
-    return;
-
-  r0 = up->r;
-  g0 = up->g;
-  b0 = up->b;
-  
-  up->r = ((((down.r - r0) * frac + 16) >> 5) + r0) & 0xff;
-  up->g = ((((down.g - g0) * frac + 16) >> 5) + g0) & 0xff;
-  up->b = ((((down.b - b0) * frac + 16) >> 5) + b0) & 0xff;
-
-}
-
 static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, int* z, uint32_t curpixel_cvg)
 {
   int summand_r, summand_b, summand_g, summand_a;
@@ -8963,37 +8024,6 @@ uint32_t vi_integer_sqrt(uint32_t a)
     }
     return res;
 }
-
-static void clearscreen(uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint32_t white)
-{
-#if 0
-  DDBLTFX ddbltfx; 
-  RECT bltrect;
-  bltrect.left = x0;
-  bltrect.right = x1 - 1;
-  bltrect.top = y0;
-  bltrect.bottom = y1 - 1;
-  memset(&ddbltfx, 0, sizeof(DDBLTFX));
-  ddbltfx.dwSize = sizeof(DDBLTFX);
-  ddbltfx.dwFillColor = 0;
-  res = IDirectDrawSurface_Blt(lpddsback, 0, lpddsprimary, 0, DDBLT_WAIT | DDBLT_COLORFILL, &ddbltfx);
-  if (res != DD_OK)
-    fatalerror("clearscreen: Blt failed.");
-#endif
-}
-
-static void clearfb16(uint16_t* fb, uint32_t width,uint32_t height)
-{
-  uint16_t* d;
-  uint32_t j;
-  int i = width << 1;
-  for (j = 0; j < height; j++)
-  {
-    d = &fb[j*width];
-    memset(d,0,i);
-  }
-}
-
 
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst)
 {

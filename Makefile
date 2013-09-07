@@ -57,8 +57,7 @@ DOXYGEN = doxygen
 
 # Remove these flags when Core.c is cleaned up...
 RDP_FLAGS = -DLITTLE_ENDIAN -DUSE_SSE -Wno-unused-parameter \
-  -Wno-unused-variable -Wno-sign-compare -Wno-unused-but-set-variable \
-  -Wno-unused-function -Wno-maybe-uninitialized
+  -Wno-sign-compare -Wno-maybe-uninitialized
 
 WARNINGS = -Wall -Wextra -pedantic
 
