@@ -7933,18 +7933,36 @@ static uint32_t dz_decompress(uint32_t dz_compressed)
   return (1 << dz_compressed);
 }
 
-static uint32_t dz_compress(uint32_t value)
-{
-  int j = 0;
-  if (value & 0xff00)
-    j |= 8;
-  if (value & 0xf0f0)
-    j |= 4;
-  if (value & 0xcccc)
-    j |= 2;
-  if (value & 0xaaaa)
-    j |= 1;
-  return j;
+static uint32_t dz_compress(uint32_t value) {
+  static const uint8_t lut[4][16] align(16) = {
+    {
+      0x00, 0x0C, 0x0D, 0x0D,
+      0x0E, 0x0E, 0x0F, 0x0F,
+      0x0F, 0x0F, 0x0F, 0x0F,
+      0x0F, 0x0F, 0x0F, 0x0F
+    },
+    {
+      0x00, 0x08, 0x09, 0x09,
+      0x0A, 0x0A, 0x0B, 0x0B,
+      0x0B, 0x0B, 0x0B, 0x0B,
+      0x0B, 0x0B, 0x0B, 0x0B
+    },
+    {
+      0x00, 0x04, 0x05, 0x05,
+      0x06, 0x06, 0x07, 0x07,
+      0x07, 0x07, 0x07, 0x07,
+      0x07, 0x07, 0x07, 0x0
+    },
+    {
+      0x00, 0x00, 0x01, 0x01,
+      0x02, 0x02, 0x03, 0x03,
+      0x03, 0x03, 0x03, 0x03,
+      0x03, 0x03, 0x03, 0x03
+    }
+  };
+
+  return lut[0][(value >> 12)] | lut[1][(value >> 8 & 0xF)] |
+    lut[2][(value >> 4 & 0xF)] | lut[3][(value & 0xF)];
 }
 
 static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int dzpixenc, uint32_t* blend_en, uint32_t* prewrap, uint32_t* curpixel_cvg, uint32_t curpixel_memcvg)
@@ -8821,9 +8839,6 @@ static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, i
   int sz = *z;
   int zanded;
 
-
-
-
   if (curpixel_cvg == 8)
   {
     r >>= 2;
@@ -8846,28 +8861,18 @@ static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, i
     a = ((a << 2) + summand_a) >> 4;
     sz = ((sz << 2) + summand_z) >> 5;
   }
-
   
   shade_color.r = special_9bit_clamptable[r & 0x1ff];
   shade_color.g = special_9bit_clamptable[g & 0x1ff];
   shade_color.b = special_9bit_clamptable[b & 0x1ff];
   shade_color.a = special_9bit_clamptable[a & 0x1ff];
-  
-  
-  
-  zanded = (sz & 0x60000) >> 17;
 
-  
-  switch(zanded)
-  {
-    case 0: *z = sz & 0x3ffff;            break;
-    case 1: *z = sz & 0x3ffff;            break;
-    case 2: *z = 0x3ffff;             break;
-    case 3: *z = 0;                 break;
-  }
+  static const uint32_t zandtable[4] = {0x3FFFF, 0x3FFFF, 0,       0};
+  static const uint32_t zortable[4] =  {0,       0,       0x3FFFF, 0};
+
+  zanded = (sz & 0x00060000) >> 17;
+  *z = (sz & zandtable[zanded]) | zortable[zanded];
 }
-
-
 
 int IsBadPtrW32(void *ptr, uint32_t bytes)
 {
