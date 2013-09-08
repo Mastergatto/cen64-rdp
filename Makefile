@@ -56,8 +56,8 @@ AR = ar
 DOXYGEN = doxygen
 
 # Remove these flags when Core.c is cleaned up...
-RDP_FLAGS = -DLITTLE_ENDIAN -DUSE_SSE -Wno-unused-parameter \
-  -Wno-sign-compare -Wno-maybe-uninitialized
+RDP_FLAGS = -DLITTLE_ENDIAN -DUSE_SSE -DSSSE3_ONLY \
+  -Wno-unused-parameter -Wno-sign-compare -Wno-maybe-uninitialized
 
 WARNINGS = -Wall -Wextra -pedantic
 

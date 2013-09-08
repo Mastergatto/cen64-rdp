@@ -19,7 +19,32 @@
 #endif
 
 #ifdef USE_SSE
+#ifdef USE_SSSE3_ONLY
+#include <tmmintrin.h>
+#else
 #include <smmintrin.h>
+#endif
+#endif
+
+/* ============================================================================
+ *  _mm_mullo_epi32: SSE2 lacks _mm_mullo_epi32, define it manually.
+ *  TODO/WARNING/DISCLAIMER: Assumes one argument is positive.
+ * ========================================================================= */
+#ifdef SSSE3_ONLY
+static __m128i
+_mm_mullo_epi32(__m128i a, __m128i b) {
+  __m128i a4 = _mm_srli_si128(a, 4);
+  __m128i b4 = _mm_srli_si128(b, 4);
+  __m128i ba = _mm_mul_epu32(b, a);
+  __m128i b4a4 = _mm_mul_epu32(b4, a4);
+
+  __m128i mask = _mm_setr_epi32(~0, 0, ~0, 0);
+  __m128i baMask = _mm_and_si128(ba, mask);
+  __m128i b4a4Mask = _mm_and_si128(b4a4, mask);
+  __m128i b4a4MaskShift = _mm_slli_si128(b4a4Mask, 4);
+
+  return _mm_or_si128(baMask, b4a4MaskShift);
+}
 #endif
 
 /* ============================================================================
