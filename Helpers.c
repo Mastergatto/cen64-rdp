@@ -328,7 +328,7 @@ MulConstant(int32_t *dest, int32_t *src, int32_t constant) {
     0x0,0x1,0x2,0x3,
   };
 
-  constantVector = _mm_load_si128((__m128i*) &constant);
+  constantVector = _mm_loadu_si128((__m128i*) &constant);
   shuffleKey = _mm_load_si128((__m128i*) ShuffleData);
   constantVector = _mm_shuffle_epi8(constantVector, shuffleKey);
 
