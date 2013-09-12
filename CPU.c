@@ -20,6 +20,14 @@
 #include <string.h>
 #endif
 
+#ifndef USE_SSE
+const char *RDPBuildType = "ANSI C";
+#elif defined(SSSE3_ONLY)
+const char *RDPBuildType = "SSSE3";
+#else
+const char *RDPBuildType = "SSE4.1";
+#endif
+
 static void InitRDP(struct RDP *rdp);
 
 /* ============================================================================

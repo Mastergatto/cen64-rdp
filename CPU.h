@@ -13,6 +13,8 @@
 #include "Externs.h"
 #include "Registers.h"
 
+extern const char *RDPBuildType;
+
 struct RDP {
   struct BusController *bus;
   uint32_t regs[NUM_DP_REGISTERS];
