@@ -19,7 +19,7 @@
 #endif
 
 #ifdef USE_SSE
-#ifdef USE_SSSE3_ONLY
+#ifdef SSSE3_ONLY
 #include <tmmintrin.h>
 #else
 #include <smmintrin.h>
