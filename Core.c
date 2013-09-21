@@ -492,13 +492,35 @@ void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
 static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF); }
 static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
 
-#define RREADADDR8(in) (assert(in <= 0x7FFFFF), rdram_8[in]);
-#define RREADIDX16(in) (assert(in <= 0x7FFFFE), bswap16(rdram_16[in]));
-#define RREADIDX32(in) (assert(in <= 0x7FFFFC), bswap32(rdram[in]));
+static uint8_t RREADADDR8(unsigned in) {
+  assert(in <= 0x7FFFFF);
+  return rdram_8[in];
+}
 
-#define RWRITEADDR8(in,val) {assert(in <= 0x7FFFFF); rdram_8[in] = (val);}
-#define RWRITEIDX16(in,val) {assert(in <= 0x7FFFFE); rdram_16[in] = bswap16(val);}
-#define RWRITEIDX32(in,val) {assert(in <= 0x7FFFFC); rdram[in] = bswap32(val);}
+static uint16_t RREADIDX16(unsigned in) {
+  assert(in <= 0x3FFFFF);
+  return bswap16(rdram_16[in]);
+}
+
+static uint32_t RREADIDX32(unsigned in) {
+  assert(in <= 0x1FFFFF);
+  return bswap32(rdram[in]);
+}
+
+static void RWRITEADDR8(unsigned in, uint8_t val) {
+  assert(in <= 0x7FFFFF);
+  rdram_8[in] = val;
+}
+
+static void RWRITEIDX16(unsigned in, uint16_t val) {
+  assert(in <= 0x3FFFFF);
+  rdram_16[in] = bswap16(val);
+}
+
+static void RWRITEIDX32(unsigned in, uint32_t val) {
+  assert(in <= 0x7FFFFF);
+  rdram[in] = bswap32(val);
+}
 
 #define PAIRREAD16(rdst,hdst,in) {assert(in <= 0x7FFFFE); \
   (rdst)=bswap16(rdram_16[in]); (hdst) = hidden_bits[in];}
