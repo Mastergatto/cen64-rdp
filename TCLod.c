@@ -14,7 +14,13 @@
 #include "Core.h"
 #include "TCLod.h"
 
+#ifdef USE_SSE
+#ifdef SSSE3_ONLY
+#include <tmmintrin.h>
+#else
 #include <smmintrin.h>
+#endif
+#endif
 
 int32_t tclod_tcclamp(int32_t x) {
   static const uint32_t LUT2[4] align(16) = {
