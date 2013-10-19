@@ -9,6 +9,7 @@
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
 #include "Common.h"
+#include "Helpers.h"
 
 #ifdef __cplusplus
 #include <cassert>
@@ -16,14 +17,6 @@
 #else
 #include <assert.h>
 #include <string.h>
-#endif
-
-#ifdef USE_SSE
-#ifdef SSSE3_ONLY
-#include <tmmintrin.h>
-#else
-#include <smmintrin.h>
-#endif
 #endif
 
 /* ============================================================================
@@ -112,6 +105,26 @@ ASR8ClearLow(int32_t *dest, const int32_t *src) {
   dest[6] = (src[6] >> 8) & ~1;
   dest[7] = (src[7] >> 8) & ~1;
 #endif
+}
+
+/* ============================================================================
+ *  BroadcastInt: Broadcasts an integer to all slices of a vector.
+ * ========================================================================= */
+__m128i
+BroadcastInt(int32_t constant) {
+  __m128i constantVector;
+  __m128i shuffleKey;
+
+  static const uint8_t ShuffleData[16] align(16) = {
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+    0x0,0x1,0x2,0x3,
+  };
+
+  constantVector = _mm_loadu_si128((__m128i*) &constant);
+  shuffleKey = _mm_load_si128((__m128i*) ShuffleData);
+  return _mm_shuffle_epi8(constantVector, shuffleKey);
 }
 
 /* ============================================================================
@@ -318,20 +331,9 @@ void
 MulConstant(int32_t *dest, int32_t *src, int32_t constant) {
 #ifdef USE_SSE
   __m128i constantVector;
-  __m128i shuffleKey;
   __m128i src1, src2;
 
-  static const uint8_t ShuffleData[16] align(16) = {
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-  };
-
-  constantVector = _mm_loadu_si128((__m128i*) &constant);
-  shuffleKey = _mm_load_si128((__m128i*) ShuffleData);
-  constantVector = _mm_shuffle_epi8(constantVector, shuffleKey);
-
+  constantVector = BroadcastInt(constant);
   src1 = _mm_load_si128((__m128i*) (src + 0));
   src2 = _mm_load_si128((__m128i*) (src + 4));
   src1 = _mm_mullo_epi32(src1, constantVector);
