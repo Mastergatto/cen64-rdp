@@ -52,9 +52,27 @@ const FBReadFunc FBReadFunc2LUT[4] = {
   FBRead_4, FBRead_8, FBRead2_16, FBRead2_32
 };
 
+/* FBWrite functions. */
+static void FBWrite4(uint32_t, uint32_t,
+  uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+static void FBWrite8(uint32_t, uint32_t,
+  uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+static void FBWrite16(uint32_t, uint32_t,
+  uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+static void FBWrite32(uint32_t, uint32_t,
+  uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+
+const FBWriteFunc FBWriteFuncLUT[4] = {
+  FBWrite4, FBWrite8, FBWrite16, FBWrite32
+};
+
 /* ============================================================================
  *  Memory access functions.
  * ========================================================================= */
+static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
+static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) |
+  ((x >> 8) & 0x00FF); }
+
 static uint8_t
 RDRAMRead8(uint32_t address) {
   assert(address < 0x7FFFFF);
@@ -77,6 +95,59 @@ RDRAMRead32(uint32_t address, uint8_t *buffer) {
 
   assert(address <= 0x7FFFFF);
   memcpy(buffer, rdram_8 + address, sizeof(data));
+}
+
+static void
+RDRAMWrite8(uint32_t address, uint8_t data) {
+  assert(address <= 0x7FFFFF);
+  rdram_8[address] = data;
+}
+
+#define PAIRWRITE16(in,rval,hval) {assert(in <= 0x7FFFFE); \
+  rdram_16[in]=bswap16(rval); hidden_bits[in]=(hval);}
+
+#define PAIRWRITE32(in,rval,hval0,hval1) {assert(in <= 0x7FFFFC); \
+  rdram[in]=bswap32(rval); hidden_bits[(in)<<1]=(hval0); \
+  hidden_bits[((in)<<1)+1]=(hval1); }
+
+#define PAIRWRITE8(in,rval,hval) {assert(in <= 0x7FFFFF); \
+  rdram_8[in]=(rval); if ((in) & 1) hidden_bits[(in)>>1]=(hval);}
+
+/* ============================================================================
+ *  Assistance functions.
+ * ========================================================================= */
+static int finalize_spanalpha(uint32_t blend_en,
+  uint32_t curpixel_cvg, uint32_t curpixel_memcvg) {
+  int finalcvg;
+  
+  switch(other_modes.cvg_dest) {
+  case CVG_CLAMP: 
+    if (!blend_en)
+      finalcvg = curpixel_cvg - 1;
+    else
+      finalcvg = curpixel_cvg + curpixel_memcvg;
+
+    if (!(finalcvg & 8))
+      finalcvg &= 7;
+    else
+      finalcvg = 7;
+
+    break;
+
+  case CVG_WRAP:
+    finalcvg = (curpixel_cvg + curpixel_memcvg) & 7;
+    break;
+
+  case CVG_ZAP: 
+    finalcvg = 7;
+    break;
+
+  case CVG_SAVE: 
+    finalcvg = curpixel_memcvg;
+    break;
+  }
+
+  return finalcvg;
 }
 
 /* ============================================================================
@@ -195,5 +266,65 @@ FBRead2_32(uint32_t curpixel, uint32_t* curpixel_memcvg) {
   *curpixel_memcvg = other_modes.image_read_en
     ? buffer[3] >> 5
     : 7;
+}
+
+/* ============================================================================
+ *  Framebuffer write functions.
+ * ========================================================================= */
+static void FBWrite4(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b,
+  uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg) {
+  uint32_t address = fb_address + curpixel;
+  RDRAMWrite8(address, 0);
+}
+
+static void FBWrite8(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b,
+  uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg) {
+  uint32_t fb = fb_address + curpixel;
+  PAIRWRITE8(fb, r & 0xff, (r & 1) ? 3 : 0);
+}
+
+static void FBWrite16(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b,
+  uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg) {
+#undef CVG_DRAW
+#ifdef CVG_DRAW
+  int covdraw = (curpixel_cvg - 1) << 5;
+  r=covdraw; g=covdraw; b=covdraw;
+#endif
+
+  uint32_t fb;
+  uint16_t rval;
+  uint8_t hval;
+  fb = (fb_address >> 1) + curpixel;  
+
+  int32_t finalcvg = finalize_spanalpha(blend_en, curpixel_cvg, curpixel_memcvg);
+  int16_t finalcolor; 
+
+  if (fb_format == FORMAT_RGBA)
+  {
+    finalcolor = ((r & ~7) << 8) | ((g & ~7) << 3) | ((b & ~7) >> 2);
+  }
+  else
+  {
+    finalcolor = (r << 8) | (finalcvg << 5);
+    finalcvg = 0;
+  }
+
+  
+  rval = finalcolor|(finalcvg >> 2);
+  hval = finalcvg & 3;
+  PAIRWRITE16(fb, rval, hval);
+}
+
+static void FBWrite32(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b,
+  uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg) {
+  uint32_t fb = (fb_address >> 2) + curpixel;
+
+  int32_t finalcolor;
+  int32_t finalcvg = finalize_spanalpha(blend_en, curpixel_cvg, curpixel_memcvg);
+    
+  finalcolor = (r << 24) | (g << 16) | (b << 8);
+  finalcolor |= (finalcvg << 5);
+
+  PAIRWRITE32(fb, finalcolor, (g & 1) ? 3 : 0, 0);
 }
 

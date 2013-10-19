@@ -192,11 +192,6 @@ typedef struct
 #define TEXEL_I16       0x12
 #define TEXEL_I32       0x13
 
-#define CVG_CLAMP       0
-#define CVG_WRAP        1
-#define CVG_ZAP         2
-#define CVG_SAVE        3
-
 #define ZMODE_OPAQUE      0
 #define ZMODE_INTERPENETRATING  1
 #define ZMODE_TRANSPARENT   2
@@ -328,10 +323,6 @@ static uint32_t rightcvghex(uint32_t x, uint32_t fmask);
 static uint32_t leftcvghex(uint32_t x, uint32_t fmask);
 static void compute_cvg_noflip(int32_t scanline);
 static void compute_cvg_flip(int32_t scanline);
-static void fbwrite_4(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
-static void fbwrite_8(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
-static void fbwrite_16(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
-static void fbwrite_32(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
 static void fbfill_4(uint32_t curpixel);
 static void fbfill_8(uint32_t curpixel);
 static void fbfill_16(uint32_t curpixel);
@@ -342,7 +333,6 @@ static uint32_t dz_compress(uint32_t value);
 static void lookup_cvmask_derivatives(uint32_t mask, uint8_t* offx, uint8_t* offy, uint32_t* curpixel_cvg, uint32_t* curpixel_cvbit);
 static void z_store(uint32_t zcurpixel, uint32_t z, int dzpixenc);
 static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int dzpixenc, uint32_t* blend_en, uint32_t* prewrap, uint32_t* curpixel_cvg, uint32_t curpixel_memcvg);
-static int finalize_spanalpha(uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg);
 static int32_t normalize_dzpix(int32_t sum);
 static int32_t CLIP(int32_t value,int32_t min,int32_t max);
 static void tcdiv_persp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst);
@@ -367,11 +357,6 @@ static int32_t lod_frac = 0;
 uint32_t DebugMode = 0, DebugMode2 = 0;
 int debugcolor = 0;
 
-static void (*fbwrite_func[4])(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = 
-{
-  fbwrite_4, fbwrite_8, fbwrite_16, fbwrite_32
-};
-
 static void (*fbfill_func[4])(uint32_t) =
 {
   fbfill_4, fbfill_8, fbfill_16, fbfill_32
@@ -394,7 +379,7 @@ static void (*render_spans_2cycle_func[4])(int, int, int, int) =
 
 void (*fbread1_ptr)(uint32_t, uint32_t*);
 void (*fbread2_ptr)(uint32_t, uint32_t*);
-void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = fbwrite_4;
+void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 void (*fbfill_ptr)(uint32_t) = fbfill_4;
 void (*get_dither_noise_ptr)(int, int, int*, int*);
 static DitherFunc rgb_dither_ptr;
@@ -426,29 +411,9 @@ void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
 static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF); }
 static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
 
-static uint16_t RREADIDX16(unsigned in) {
-  assert(in <= 0x3FFFFF);
-  return bswap16(rdram_16[in]);
-}
-
 static uint32_t RREADIDX32(unsigned in) {
   assert(in <= 0x1FFFFF);
   return bswap32(rdram[in]);
-}
-
-static void RWRITEADDR8(unsigned in, uint8_t val) {
-  assert(in <= 0x7FFFFF);
-  rdram_8[in] = val;
-}
-
-static void RWRITEIDX16(unsigned in, uint16_t val) {
-  assert(in <= 0x3FFFFF);
-  rdram_16[in] = bswap16(val);
-}
-
-static void RWRITEIDX32(unsigned in, uint32_t val) {
-  assert(in <= 0x7FFFFF);
-  rdram[in] = bswap32(val);
 }
 
 #define PAIRREAD16(rdst,hdst,in) {assert(in <= 0x7FFFFE); \
@@ -762,6 +727,7 @@ int rdp_init()
   get_dither_noise_ptr = DitherNoiseFuncLUT[0];
   fbread1_ptr = FBReadFuncLUT[0];
   fbread2_ptr = FBReadFunc2LUT[0];
+  fbwrite_ptr = FBWriteFuncLUT[0];
 
   combiner_rgbsub_a_r[0] = combiner_rgbsub_a_r[1] = &one_color;
   combiner_rgbsub_a_g[0] = combiner_rgbsub_a_g[1] = &one_color;
@@ -6240,7 +6206,7 @@ static void rdp_set_color_image(uint32_t w1, uint32_t w2)
   
   fbread1_ptr = FBReadFuncLUT[fb_size];
   fbread2_ptr = FBReadFunc2LUT[fb_size];
-  fbwrite_ptr = fbwrite_func[fb_size];
+  fbwrite_ptr = FBWriteFuncLUT[fb_size];
   fbfill_ptr = fbfill_func[fb_size];
 }
 
@@ -6568,63 +6534,6 @@ int rdp_close()
   return 0;
 }
 
-static void fbwrite_4(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg)
-{
-  uint32_t fb = fb_address + curpixel;
-  RWRITEADDR8(fb, 0);
-}
-
-static void fbwrite_8(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg)
-{
-  uint32_t fb = fb_address + curpixel;
-  PAIRWRITE8(fb, r & 0xff, (r & 1) ? 3 : 0);
-}
-
-static void fbwrite_16(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg)
-{
-#undef CVG_DRAW
-#ifdef CVG_DRAW
-  int covdraw = (curpixel_cvg - 1) << 5;
-  r=covdraw; g=covdraw; b=covdraw;
-#endif
-
-  uint32_t fb;
-  uint16_t rval;
-  uint8_t hval;
-  fb = (fb_address >> 1) + curpixel;  
-
-  int32_t finalcvg = finalize_spanalpha(blend_en, curpixel_cvg, curpixel_memcvg);
-  int16_t finalcolor; 
-
-  if (fb_format == FORMAT_RGBA)
-  {
-    finalcolor = ((r & ~7) << 8) | ((g & ~7) << 3) | ((b & ~7) >> 2);
-  }
-  else
-  {
-    finalcolor = (r << 8) | (finalcvg << 5);
-    finalcvg = 0;
-  }
-
-  
-  rval = finalcolor|(finalcvg >> 2);
-  hval = finalcvg & 3;
-  PAIRWRITE16(fb, rval, hval);
-}
-
-static void fbwrite_32(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg)
-{
-  uint32_t fb = (fb_address >> 2) + curpixel;
-
-  int32_t finalcolor;
-  int32_t finalcvg = finalize_spanalpha(blend_en, curpixel_cvg, curpixel_memcvg);
-    
-  finalcolor = (r << 24) | (g << 16) | (b << 8);
-  finalcolor |= (finalcvg << 5);
-
-  PAIRWRITE32(fb, finalcolor, (g & 1) ? 3 : 0, 0);
-}
-
 static void fbfill_4(uint32_t curpixel) {
   debug("fbfill_4: Pipeline crashed.");
 }
@@ -6830,44 +6739,6 @@ static uint32_t z_compare(uint32_t zcurpixel, uint32_t sz, uint16_t dzpix, int d
 
     return 1;
   }
-}
-
-static int finalize_spanalpha(uint32_t blend_en, uint32_t curpixel_cvg, uint32_t curpixel_memcvg)
-{
-  int finalcvg;
-
-  
-  
-  switch(other_modes.cvg_dest)
-  {
-  case CVG_CLAMP: 
-    if (!blend_en)
-    {
-      finalcvg = curpixel_cvg - 1;
-      
-      
-    }
-    else
-    {
-      finalcvg = curpixel_cvg + curpixel_memcvg;
-    }
-    if (!(finalcvg & 8))
-      finalcvg &= 7;
-    else
-      finalcvg = 7;
-    break;
-  case CVG_WRAP:
-    finalcvg = (curpixel_cvg + curpixel_memcvg) & 7;
-    break;
-  case CVG_ZAP: 
-    finalcvg = 7;
-    break;
-  case CVG_SAVE: 
-    finalcvg = curpixel_memcvg;
-    break;
-  }
-
-  return finalcvg;
 }
 
 static int32_t normalize_dzpix(int32_t sum)

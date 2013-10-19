@@ -21,6 +21,11 @@
 #define FORMAT_IA   3
 #define FORMAT_I    4
 
+#define CVG_CLAMP   0
+#define CVG_WRAP    1
+#define CVG_ZAP     2
+#define CVG_SAVE    3
+
 extern COLOR memory_color;
 extern COLOR pre_memory_color;
 extern uint32_t fb_address;
@@ -29,9 +34,12 @@ extern int32_t fb_format;
 extern uint8_t hidden_bits[0x400000];
 
 typedef void (*FBReadFunc)(uint32_t, uint32_t *);
+typedef void (*FBWriteFunc)(uint32_t, uint32_t,
+  uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 extern const FBReadFunc FBReadFuncLUT[4];
 extern const FBReadFunc FBReadFunc2LUT[4];
+extern const FBWriteFunc FBWriteFuncLUT[4];
 
 #endif
 
