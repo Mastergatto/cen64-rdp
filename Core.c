@@ -61,21 +61,6 @@ static void fatalerror(const char * err, ...)
   exit(0);
 }
 
-static void popmessage(const char* err, ...)
-{
-  char VsprintfBuffer[200];
-  va_list arg;
-  va_start(arg, err);
-  vsprintf(VsprintfBuffer, err, arg);
-#ifdef WIN32
-  MessageBoxA(0,VsprintfBuffer,"RDP: warning",MB_OK);
-#endif
-#ifndef WIN32
-  printf(VsprintfBuffer);
-#endif
-  va_end(arg);
-}
-
 uint32_t rdp_cmd_data[0x10000];
 uint32_t rdp_cmd_ptr = 0;
 uint32_t rdp_cmd_cur = 0;
