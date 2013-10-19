@@ -543,7 +543,6 @@ uint32_t max_level = 0;
 int32_t min_level = 0;
 int32_t* PreScale;
 uint32_t tvfadeoutstate[625];
-int rdp_pipeline_crashed = 0;
 
 static void tcmask(int32_t* S, int32_t* T, int32_t num);
 static void tcmask(int32_t* S, int32_t* T, int32_t num)
@@ -866,7 +865,6 @@ int rdp_init()
   memset(&key_scale, 0, sizeof(COLOR));
   memset(&key_center, 0, sizeof(COLOR));
 
-  rdp_pipeline_crashed = 0;
   memset(&onetimewarnings, 0, sizeof(onetimewarnings));
 
   rdram_8 = (uint8_t*)rdram;
@@ -4625,25 +4623,21 @@ void render_spans_2cycle_notex(int start, int end, int tilenum, int flip)
 
 void render_spans_fill(int start, int end, int flip)
 {
-  if (fb_size == PIXEL_SIZE_4BIT)
-  {
-    rdp_pipeline_crashed = 1;
+  if (fb_size == PIXEL_SIZE_4BIT) {
+#ifndef NDEBUG
+    debug("Pipeline crashed.");
+#endif
     return;
   }
 
   int i, j;
-  
-  int fastkillbits = other_modes.image_read_en || other_modes.z_compare_en;
-  int slowkillbits = other_modes.z_update_en && !other_modes.z_source_sel && !fastkillbits;
-
   int xinc = flip ? 1 : -1;
 
   int xstart = 0, xendsc;
   int curpixel = 0;
   int x, length;
         
-  for (i = start; i <= end; i++)
-  {
+  for (i = start; i <= end; i++) {
     xstart = span[i].lx;
     xendsc = span[i].rx;
 
@@ -4651,38 +4645,32 @@ void render_spans_fill(int start, int end, int flip)
     curpixel = fb_width * i + x;
     length = flip ? (xstart - xendsc) : (xendsc - xstart);
 
-    if (span[i].validline)
-    {
-      if (fastkillbits && length >= 0)
-      {
-        if (!onetimewarnings.fillmbitcrashes)
-          popmessage("render_spans_fill: image_read_en %x z_update_en %x z_compare_en %x. RDP crashed",
-          other_modes.image_read_en, other_modes.z_update_en, other_modes.z_compare_en);
-        onetimewarnings.fillmbitcrashes = 1;
-        rdp_pipeline_crashed = 1;
+    if (span[i].validline) {
+#ifndef NDEBUG
+      int fastkillbits = other_modes.image_read_en ||
+        other_modes.z_compare_en;
+
+      if (fastkillbits && length >= 0) {
+        debug("render_spans_fill: Pipeline crashed.");
         return;
       }
-
+#endif
       
-      
-      
-      
-      for (j = 0; j <= length; j++)
-      {
+      for (j = 0; j <= length; j++) {
         fbfill_ptr(curpixel);
         x += xinc;
         curpixel += xinc;
       }
 
-      if (slowkillbits && length >= 0)
-      {
-        if (!onetimewarnings.fillmbitcrashes)
-          popmessage("render_spans_fill: image_read_en %x z_update_en %x z_compare_en %x z_source_sel %x. RDP crashed",
-          other_modes.image_read_en, other_modes.z_update_en, other_modes.z_compare_en, other_modes.z_source_sel);
-        onetimewarnings.fillmbitcrashes = 1;
-        rdp_pipeline_crashed = 1;
+#ifndef NDEBUG
+      int slowkillbits = other_modes.z_update_en &&
+        !other_modes.z_source_sel && !fastkillbits;
+
+      if (slowkillbits && length >= 0) {
+        debug("render_spans_fill: Pipeline crashed.");
         return;
       }
+#endif
     }
   }
 }
@@ -4691,11 +4679,12 @@ void render_spans_copy(int start, int end, int tilenum, int flip)
 {
   int i, j, k;
 
-  if (fb_size == PIXEL_SIZE_32BIT)
-  {
-    rdp_pipeline_crashed = 1;
+#ifndef NDEBUG
+  if (fb_size == PIXEL_SIZE_32BIT) {
+    debug("render_spans_copy: Pipeline crashed.");
     return;
   }
+#endif
   
   int tile1 = tilenum;
   int prim_tile = tilenum;
@@ -4853,11 +4842,12 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
   int tmem_formatting = 0;
   uint32_t bit3fl = 0, hibit = 0;
 
-  if (end > start && ltlut)
-  {
-    rdp_pipeline_crashed = 1;
+#ifndef NDEBUG
+  if (end > start && ltlut) {
+    debug("loading_pipeline: Pipeline crashed.");
     return;
   }
+#endif
 
   if (tile[tilenum].format == FORMAT_YUV)
     tmem_formatting = 0;
@@ -4871,8 +4861,10 @@ void loading_pipeline(int start, int end, int tilenum, int coord_quad, int ltlut
   switch (ti_size)
   {
   case PIXEL_SIZE_4BIT:
-    rdp_pipeline_crashed = 1;
+#ifndef NDEBUG
+    debug("loading_pipeline: Pipeline crashed.");
     return;
+#endif
     break;
   case PIXEL_SIZE_8BIT:
     tiadvance = 8;
@@ -6393,7 +6385,7 @@ void RDPProcessList(struct RDP *rdp)
     }
   }
 
-  while (rdp_cmd_cur < rdp_cmd_ptr && !rdp_pipeline_crashed)
+  while (rdp_cmd_cur < rdp_cmd_ptr)
   {
     cmd = (rdp_cmd_data[rdp_cmd_cur] >> 24) & 0x3f;
     cmd_length = rdp_command_length[cmd] >> 2;
@@ -6717,9 +6709,8 @@ static void fbwrite_32(uint32_t curpixel, uint32_t r, uint32_t g, uint32_t b, ui
   PAIRWRITE32(fb, finalcolor, (g & 1) ? 3 : 0, 0);
 }
 
-static void fbfill_4(uint32_t curpixel)
-{
-  rdp_pipeline_crashed = 1;
+static void fbfill_4(uint32_t curpixel) {
+  debug("fbfill_4: Pipeline crashed.");
 }
 
 static void fbfill_8(uint32_t curpixel)
