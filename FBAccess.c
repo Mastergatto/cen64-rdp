@@ -16,16 +16,15 @@
 
 #ifdef __cplusplus
 #include <cassert>
+#include <cstring>
 #else
 #include <assert.h>
+#include <string.h>
 #endif
 
 #define GET_LOW(x) (((x) & 0x3E) << 2)
 #define GET_MED(x) (((x) & 0x7C0) >> 3)
 #define GET_HI(x)  (((x) >> 8) & 0xF8)
-
-#define PAIRREAD16(rdst,hdst,in) {assert(in <= 0x7FFFFE); \
-  (rdst)=bswap16(rdram_16[in]); (hdst) = hidden_bits[in];}
 
 /* Global data. */
 COLOR memory_color;
@@ -35,13 +34,13 @@ uint32_t fb_address;
 int32_t fb_format = FORMAT_RGBA;
 uint8_t hidden_bits[0x400000];
 
+static const COLOR ResetColor = {0x00, 0x00, 0x00, 0xE0};
+
 /* FBRead functions. */
 static void FBRead_4(uint32_t, uint32_t *);
 static void FBRead_8(uint32_t, uint32_t *);
 static void FBRead_16(uint32_t, uint32_t *);
 static void FBRead_32(uint32_t, uint32_t *);
-static void FBRead2_4(uint32_t, uint32_t *);
-static void FBRead2_8(uint32_t, uint32_t *);
 static void FBRead2_16(uint32_t, uint32_t *);
 static void FBRead2_32(uint32_t, uint32_t *);
 
@@ -50,59 +49,61 @@ const FBReadFunc FBReadFuncLUT[4] = {
 };
 
 const FBReadFunc FBReadFunc2LUT[4] = {
-  FBRead2_4, FBRead2_8, FBRead2_16, FBRead2_32
+  FBRead_4, FBRead_8, FBRead2_16, FBRead2_32
 };
 
-#define bswap16(x) (((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF))
-#define bswap32(x) __builtin_bswap32(x)
-
-static uint8_t RREADADDR8(unsigned in) {
-  assert(in <= 0x7FFFFF);
-  return rdram_8[in];
+/* ============================================================================
+ *  Memory access functions.
+ * ========================================================================= */
+static uint8_t
+RDRAMRead8(uint32_t address) {
+  assert(address < 0x7FFFFF);
+  return rdram_8[address];
 }
 
-static uint32_t RREADIDX32(unsigned in) {
-  assert(in <= 0x1FFFFF);
-  return bswap32(rdram[in]);
+static void
+RDRAMRead16H(uint32_t address, uint16_t *hword, uint8_t *hbyte) {
+  uint16_t data;
+
+  assert(address < 0x7FFFFF);
+  memcpy(&data, rdram_8 + address, sizeof(data));
+  *hword = ByteOrderSwap16(data);
+  *hbyte = hidden_bits[address >> 1];
 }
 
+static void
+RDRAMRead32(uint32_t address, uint8_t *buffer) {
+  uint32_t data;
+
+  assert(address <= 0x7FFFFF);
+  memcpy(buffer, rdram_8 + address, sizeof(data));
+}
+
+/* ============================================================================
+ *  Framebuffer read functions.
+ * ========================================================================= */
 static void
 FBRead_4(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  memory_color.r = memory_color.g = memory_color.b = 0;
-  
-  *curpixel_memcvg = 7;
-  memory_color.a = 0xe0;
-}
-
-static void
-FBRead2_4(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = 0;
-  pre_memory_color.a = 0xe0;
+  memory_color = ResetColor;
   *curpixel_memcvg = 7;
 }
 
 static void
 FBRead_8(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  uint8_t mem = RREADADDR8(fb_address + curpixel);
-  memory_color.r = memory_color.g = memory_color.b = mem;
-  *curpixel_memcvg = 7;
-  memory_color.a = 0xe0;
-}
+  uint32_t address = fb_address + curpixel;
+  uint32_t component = RDRAMRead8(address);
 
-static void
-FBRead2_8(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  uint8_t mem = RREADADDR8(fb_address + curpixel);
-  pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = mem;
-  pre_memory_color.a = 0xe0;
+  memory_color.r = memory_color.g = memory_color.b = component;
+  memory_color.a = 0xE0;
   *curpixel_memcvg = 7;
 }
 
 static void FBRead_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
+  uint32_t address = fb_address + (curpixel << 1);
+  uint8_t hbyte, lowbits;
   uint16_t fword;
-  uint8_t hbyte;
-  uint32_t addr = (fb_address >> 1) + curpixel;
-  PAIRREAD16(fword, hbyte, addr);
-  uint8_t lowbits;
+
+  RDRAMRead16H(address, &fword, &hbyte);
 
   if (fb_format == FORMAT_RGBA) {
     memory_color.r = GET_HI(fword);
@@ -112,7 +113,11 @@ static void FBRead_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
   }
 
   else {
-    memory_color.r = memory_color.g = memory_color.b = fword >> 8;
+    uint32_t component = fword >> 8;
+
+    memory_color.r = component;
+    memory_color.g = component;
+    memory_color.b = component;
     lowbits = (fword >> 5) & 7;
   }
 
@@ -123,17 +128,17 @@ static void FBRead_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
 
   else {
     *curpixel_memcvg = 7;
-    memory_color.a = 0xe0;
+    memory_color.a = 0xE0;
   }
 }
 
 static void
 FBRead2_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
+  uint32_t address = fb_address + (curpixel << 1);
+  uint8_t hbyte, lowbits;
   uint16_t fword;
-  uint8_t hbyte;
-  uint32_t addr = (fb_address >> 1) + curpixel;
-  PAIRREAD16(fword, hbyte, addr);
-  uint8_t lowbits;
+
+  RDRAMRead16H(address, &fword, &hbyte);
 
   if (fb_format == FORMAT_RGBA) {
     pre_memory_color.r = GET_HI(fword);
@@ -143,7 +148,11 @@ FBRead2_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
   }
 
   else {
-    pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = fword >> 8;
+    uint32_t component = fword >> 8;
+
+    pre_memory_color.r = component;
+    pre_memory_color.g = component;
+    pre_memory_color.b = component;
     lowbits = (fword >> 5) & 7;
   }
 
@@ -154,43 +163,37 @@ FBRead2_16(uint32_t curpixel, uint32_t* curpixel_memcvg) {
 
   else {
     *curpixel_memcvg = 7;
-    pre_memory_color.a = 0xe0;
+    pre_memory_color.a = 0xE0;
   }
 }
 
 static void
 FBRead_32(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  uint32_t mem = RREADIDX32((fb_address >> 2) + curpixel);
-  memory_color.r = (mem >> 24) & 0xff;
-  memory_color.g = (mem >> 16) & 0xff;
-  memory_color.b = (mem >> 8) & 0xff;
+  uint8_t buffer[4];
 
-  if (other_modes.image_read_en) {
-    *curpixel_memcvg = (mem >> 5) & 7;
-    memory_color.a = (mem) & 0xe0;
-  }
+  RDRAMRead32(fb_address + curpixel, buffer);
+  memory_color.r = buffer[0];
+  memory_color.g = buffer[1];
+  memory_color.b = buffer[2];
+  memory_color.a = buffer[3] & 0xE0;
 
-  else {
-    *curpixel_memcvg = 7;
-    memory_color.a = 0xe0;
-  }
+  *curpixel_memcvg = other_modes.image_read_en
+    ? buffer[3] >> 5
+    : 7;
 }
 
 static void
 FBRead2_32(uint32_t curpixel, uint32_t* curpixel_memcvg) {
-  uint32_t mem = RREADIDX32((fb_address >> 2) + curpixel);
-  pre_memory_color.r = (mem >> 24) & 0xff;
-  pre_memory_color.g = (mem >> 16) & 0xff;
-  pre_memory_color.b = (mem >> 8) & 0xff;
+  uint8_t buffer[4];
 
-  if (other_modes.image_read_en) {
-    *curpixel_memcvg = (mem >> 5) & 7;
-    pre_memory_color.a = (mem) & 0xe0;
-  }
+  RDRAMRead32(fb_address + curpixel, buffer);
+  pre_memory_color.r = buffer[0];
+  pre_memory_color.g = buffer[1];
+  pre_memory_color.b = buffer[2];
+  pre_memory_color.a = buffer[3] & 0xE0;
 
-  else {
-    *curpixel_memcvg = 7;
-    pre_memory_color.a = 0xe0;
-  }
+  *curpixel_memcvg = other_modes.image_read_en
+    ? buffer[3] >> 5
+    : 7;
 }
 
