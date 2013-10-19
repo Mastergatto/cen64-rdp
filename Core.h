@@ -66,9 +66,17 @@
 
 #define DWORD_XOR_DWORD_SWAP 1
 
+extern uint8_t *rdram_8;
+extern uint16_t *rdram_16;
+extern uint32_t *rdram;
+
 struct RDP;
 void RDPProcessList(struct RDP *);
 int rdp_init();
+
+typedef struct {
+  int32_t r, g, b, a;
+} COLOR;
 
 typedef struct {
   int stalederivs;

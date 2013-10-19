@@ -16,6 +16,7 @@
 #include "Definitions.h"
 #include "Dither.h"
 #include "Externs.h"
+#include "FBAccess.h"
 #include "Helpers.h"
 #include "Random.h"
 #include "Registers.h"
@@ -93,13 +94,7 @@ int spans_cdr, spans_cdg, spans_cdb, spans_cda, spans_cdz;
 
 static int spans_dsdy, spans_dtdy, spans_dwdy;
 
-typedef struct
-{
-  int32_t r, g, b, a;
-} COLOR;
-
-typedef struct
-{
+typedef struct {
   uint8_t r, g, b;
 } FBCOLOR;
 
@@ -175,12 +170,6 @@ typedef struct
 #define CYCLE_TYPE_2      1
 #define CYCLE_TYPE_COPY     2
 #define CYCLE_TYPE_FILL     3
-
-#define FORMAT_RGBA       0
-#define FORMAT_YUV        1
-#define FORMAT_CI       2
-#define FORMAT_IA       3
-#define FORMAT_I        4
 
 #define TEXEL_RGBA4       0
 #define TEXEL_RGBA8       1
@@ -266,18 +255,14 @@ static int32_t *blender2b_a[2];
 COLOR pixel_color;
 COLOR inv_pixel_color;
 COLOR blended_pixel_color;
-COLOR memory_color;
-COLOR pre_memory_color;
 
 uint32_t fill_color;    
 
 uint32_t primitive_z;
 uint16_t primitive_delta_z;
 
-static int fb_format = FORMAT_RGBA;
 static int fb_size = PIXEL_SIZE_4BIT;
 static int fb_width = 0;
-static uint32_t fb_address = 0;
 
 static int ti_format = FORMAT_RGBA;
 static int ti_size = PIXEL_SIZE_4BIT;
@@ -351,14 +336,6 @@ static void fbfill_4(uint32_t curpixel);
 static void fbfill_8(uint32_t curpixel);
 static void fbfill_16(uint32_t curpixel);
 static void fbfill_32(uint32_t curpixel);
-static void fbread_4(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread_8(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread_16(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread_32(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread2_4(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread2_8(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread2_16(uint32_t num, uint32_t* curpixel_memcvg);
-static void fbread2_32(uint32_t num, uint32_t* curpixel_memcvg);
 static uint32_t z_decompress(uint32_t rawz);
 static uint32_t dz_decompress(uint32_t compresseddz);
 static uint32_t dz_compress(uint32_t value);
@@ -389,17 +366,6 @@ static int32_t k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0;
 static int32_t lod_frac = 0;
 uint32_t DebugMode = 0, DebugMode2 = 0;
 int debugcolor = 0;
-uint8_t hidden_bits[0x400000];
-
-static void (*fbread_func[4])(uint32_t, uint32_t*) = 
-{
-  fbread_4, fbread_8, fbread_16, fbread_32
-};
-
-static void (*fbread2_func[4])(uint32_t, uint32_t*) =
-{
-  fbread2_4, fbread2_8, fbread2_16, fbread2_32
-};
 
 static void (*fbwrite_func[4])(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = 
 {
@@ -426,8 +392,8 @@ static void (*render_spans_2cycle_func[4])(int, int, int, int) =
   render_spans_2cycle_notex, render_spans_2cycle_notexel1, render_spans_2cycle_notexelnext, render_spans_2cycle_complete
 };
 
-void (*fbread1_ptr)(uint32_t, uint32_t*) = fbread_4;
-void (*fbread2_ptr)(uint32_t, uint32_t*) = fbread2_4;
+void (*fbread1_ptr)(uint32_t, uint32_t*);
+void (*fbread2_ptr)(uint32_t, uint32_t*);
 void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = fbwrite_4;
 void (*fbfill_ptr)(uint32_t) = fbfill_4;
 void (*get_dither_noise_ptr)(int, int, int*, int*);
@@ -436,7 +402,7 @@ void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*) = tcdiv_nopersp
 void (*render_spans_1cycle_ptr)(int, int, int, int) = render_spans_1cycle_complete;
 void (*render_spans_2cycle_ptr)(int, int, int, int) = render_spans_2cycle_notexel1;
 
-static uint32_t* rdram;
+uint32_t *rdram;
 static uint32_t* rsp_dmem;
 
 /* TYLER: Temporary hack. */
@@ -459,11 +425,6 @@ void RDPSetRSPDMEMPointer(uint8_t *rsp_dmem_ptr) {
 
 static uint16_t bswap16(uint16_t x) { return ((x << 8) & 0xFF00) | ((x >> 8) & 0x00FF); }
 static uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
-
-static uint8_t RREADADDR8(unsigned in) {
-  assert(in <= 0x7FFFFF);
-  return rdram_8[in];
-}
 
 static uint16_t RREADIDX16(unsigned in) {
   assert(in <= 0x3FFFFF);
@@ -799,6 +760,8 @@ int rdp_init()
 {
   rgb_dither_ptr = DitherFuncLUT[0];
   get_dither_noise_ptr = DitherNoiseFuncLUT[0];
+  fbread1_ptr = FBReadFuncLUT[0];
+  fbread2_ptr = FBReadFunc2LUT[0];
 
   combiner_rgbsub_a_r[0] = combiner_rgbsub_a_r[1] = &one_color;
   combiner_rgbsub_a_g[0] = combiner_rgbsub_a_g[1] = &one_color;
@@ -6275,8 +6238,8 @@ static void rdp_set_color_image(uint32_t w1, uint32_t w2)
   fb_address  = w2 & 0x0ffffff;
 
   
-  fbread1_ptr = fbread_func[fb_size];
-  fbread2_ptr = fbread2_func[fb_size];
+  fbread1_ptr = FBReadFuncLUT[fb_size];
+  fbread2_ptr = FBReadFunc2LUT[fb_size];
   fbwrite_ptr = fbwrite_func[fb_size];
   fbfill_ptr = fbfill_func[fb_size];
 }
@@ -6691,140 +6654,6 @@ static void fbfill_32(uint32_t curpixel)
 {
   uint32_t fb = (fb_address >> 2) + curpixel;
   PAIRWRITE32(fb, fill_color, (fill_color & 0x10000) ? 3 : 0, (fill_color & 0x1) ? 3 : 0);
-}
-
-static void fbread_4(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  memory_color.r = memory_color.g = memory_color.b = 0;
-  
-  *curpixel_memcvg = 7;
-  memory_color.a = 0xe0;
-}
-
-static void fbread2_4(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = 0;
-  pre_memory_color.a = 0xe0;
-  *curpixel_memcvg = 7;
-}
-
-static void fbread_8(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint8_t mem = RREADADDR8(fb_address + curpixel);
-  memory_color.r = memory_color.g = memory_color.b = mem;
-  *curpixel_memcvg = 7;
-  memory_color.a = 0xe0;
-}
-
-static void fbread2_8(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint8_t mem = RREADADDR8(fb_address + curpixel);
-  pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = mem;
-  pre_memory_color.a = 0xe0;
-  *curpixel_memcvg = 7;
-}
-
-static void fbread_16(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint16_t fword;
-  uint8_t hbyte;
-  uint32_t addr = (fb_address >> 1) + curpixel;
-  PAIRREAD16(fword, hbyte, addr);
-  uint8_t lowbits;
-
-  if (fb_format == FORMAT_RGBA)
-  {
-    memory_color.r = GET_HI(fword);
-    memory_color.g = GET_MED(fword);
-    memory_color.b = GET_LOW(fword);
-    lowbits = ((fword & 1) << 2) | hbyte;
-  }
-  else
-  {
-    memory_color.r = memory_color.g = memory_color.b = fword >> 8;
-    lowbits = (fword >> 5) & 7;
-  }
-
-  if (other_modes.image_read_en)
-  {
-    *curpixel_memcvg = lowbits;
-    memory_color.a = lowbits << 5;
-  }
-  else
-  {
-    *curpixel_memcvg = 7;
-    memory_color.a = 0xe0;
-  }
-}
-
-static void fbread2_16(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint16_t fword;
-  uint8_t hbyte;
-  uint32_t addr = (fb_address >> 1) + curpixel;
-  PAIRREAD16(fword, hbyte, addr);
-  uint8_t lowbits;
-
-  if (fb_format == FORMAT_RGBA)
-  {
-    pre_memory_color.r = GET_HI(fword);
-    pre_memory_color.g = GET_MED(fword);
-    pre_memory_color.b = GET_LOW(fword);
-    lowbits = ((fword & 1) << 2) | hbyte;
-  }
-  else
-  {
-    pre_memory_color.r = pre_memory_color.g = pre_memory_color.b = fword >> 8;
-    lowbits = (fword >> 5) & 7;
-  }
-
-  if (other_modes.image_read_en)
-  {
-    *curpixel_memcvg = lowbits;
-    pre_memory_color.a = lowbits << 5;
-  }
-  else
-  {
-    *curpixel_memcvg = 7;
-    pre_memory_color.a = 0xe0;
-  }
-  
-}
-
-static void fbread_32(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint32_t mem = RREADIDX32((fb_address >> 2) + curpixel);
-  memory_color.r = (mem >> 24) & 0xff;
-  memory_color.g = (mem >> 16) & 0xff;
-  memory_color.b = (mem >> 8) & 0xff;
-  if (other_modes.image_read_en)
-  {
-    *curpixel_memcvg = (mem >> 5) & 7;
-    memory_color.a = (mem) & 0xe0;
-  }
-  else
-  {
-    *curpixel_memcvg = 7;
-    memory_color.a = 0xe0;
-  }
-}
-
-static void fbread2_32(uint32_t curpixel, uint32_t* curpixel_memcvg)
-{
-  uint32_t mem = RREADIDX32((fb_address >> 2) + curpixel);
-  pre_memory_color.r = (mem >> 24) & 0xff;
-  pre_memory_color.g = (mem >> 16) & 0xff;
-  pre_memory_color.b = (mem >> 8) & 0xff;
-  if (other_modes.image_read_en)
-  {
-    *curpixel_memcvg = (mem >> 5) & 7;
-    pre_memory_color.a = (mem) & 0xe0;
-  }
-  else
-  {
-    *curpixel_memcvg = 7;
-    pre_memory_color.a = 0xe0;
-  }
 }
 
 static uint32_t z_decompress(uint32_t zb)
