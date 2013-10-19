@@ -1,5 +1,5 @@
 /* ============================================================================
- *  Dither.h: Dithering Functions.
+ *  Random.h: RNG functions.
  *
  *  Original author: `MooglyGuy`. Many thanks to: Ville Linde, `angrylion`,
  *  Shoutouts to: `olivieryuyu`, `marshallh`, `LaC`, `oman`, `pinchy`, `ziggy`,
@@ -10,17 +10,10 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'MAMELICENSE', which is part of this source code package.
  * ========================================================================= */
-#ifndef __DITHER_H__
-#define __DITHER_H__
+#ifndef __RANDOM_H__
+#define __RANDOM_H__
 #include "Common.h"
 
-typedef void (*DitherFunc)(int32_t *, int32_t *, int32_t *, int32_t);
-typedef void (*DitherNoiseFunc)(int32_t, int32_t, int32_t *, int32_t *);
-
-extern const DitherFunc DitherFuncLUT[2];
-extern const DitherNoiseFunc DitherNoiseFuncLUT[3];
-
-extern int32_t noise;
+int32_t irand();
 
 #endif
-

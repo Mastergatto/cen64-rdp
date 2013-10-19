@@ -1,5 +1,5 @@
 /* ============================================================================
- *  Dither.h: Dithering Functions.
+ *  Random.c: RNG functions.
  *
  *  Original author: `MooglyGuy`. Many thanks to: Ville Linde, `angrylion`,
  *  Shoutouts to: `olivieryuyu`, `marshallh`, `LaC`, `oman`, `pinchy`, `ziggy`,
@@ -10,17 +10,17 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'MAMELICENSE', which is part of this source code package.
  * ========================================================================= */
-#ifndef __DITHER_H__
-#define __DITHER_H__
 #include "Common.h"
+#include "Random.h"
 
-typedef void (*DitherFunc)(int32_t *, int32_t *, int32_t *, int32_t);
-typedef void (*DitherNoiseFunc)(int32_t, int32_t, int32_t *, int32_t *);
+/* Global data. */
+int32_t iseed = 1;
 
-extern const DitherFunc DitherFuncLUT[2];
-extern const DitherNoiseFunc DitherNoiseFuncLUT[3];
+int32_t
+irand() {
+  iseed *= 0x343FD;
+  iseed += 0x269EC3;
 
-extern int32_t noise;
-
-#endif
+  return ((iseed >> 16) & 0x7FFF);
+}
 
