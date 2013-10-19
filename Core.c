@@ -14,6 +14,7 @@
 #include "Core.h"
 #include "CPU.h"
 #include "Definitions.h"
+#include "Dither.h"
 #include "Externs.h"
 #include "Helpers.h"
 #include "Registers.h"
@@ -397,8 +398,6 @@ static void get_texel1_1cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, in
 static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t, int32_t w, int32_t dsinc, int32_t dtinc, int32_t dwinc);
 static void calculate_clamp_diffs(uint32_t tile);
 static void calculate_tile_derivs(uint32_t tile);
-static void rgb_dither_complete(int* r, int* g, int* b, int dith);
-static void rgb_dither_nothing(int* r, int* g, int* b, int dith);
 static void get_dither_noise_complete(int x, int y, int* cdith, int* adith);
 static void get_dither_only(int x, int y, int* cdith, int* adith);
 static void get_dither_nothing(int x, int y, int* cdith, int* adith);
@@ -438,11 +437,6 @@ static void (*get_dither_noise_func[3])(int, int, int*, int*) =
   get_dither_noise_complete, get_dither_only, get_dither_nothing
 };
 
-static void (*rgb_dither_func[2])(int*, int*, int*, int) =
-{
-  rgb_dither_complete, rgb_dither_nothing
-};
-
 static void (*tcdiv_func[2])(int32_t, int32_t, int32_t, int32_t*, int32_t*) =
 {
   tcdiv_nopersp, tcdiv_persp
@@ -463,7 +457,7 @@ void (*fbread2_ptr)(uint32_t, uint32_t*) = fbread2_4;
 void (*fbwrite_ptr)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) = fbwrite_4;
 void (*fbfill_ptr)(uint32_t) = fbfill_4;
 void (*get_dither_noise_ptr)(int, int, int*, int*) = get_dither_noise_complete;
-void (*rgb_dither_ptr)(int*, int*, int*, int) = rgb_dither_complete;
+static DitherFunc rgb_dither_ptr;
 void (*tcdiv_ptr)(int32_t, int32_t, int32_t, int32_t*, int32_t*) = tcdiv_nopersp;
 void (*render_spans_1cycle_ptr)(int, int, int, int) = render_spans_1cycle_complete;
 void (*render_spans_2cycle_ptr)(int, int, int, int) = render_spans_2cycle_notexel1;
@@ -830,6 +824,7 @@ static void tcclamp_cycle_light(int32_t* S, int32_t* T, int32_t maxs, int32_t ma
 
 int rdp_init()
 {
+  rgb_dither_ptr = DitherFuncLUT[0];
   combiner_rgbsub_a_r[0] = combiner_rgbsub_a_r[1] = &one_color;
   combiner_rgbsub_a_g[0] = combiner_rgbsub_a_g[1] = &one_color;
   combiner_rgbsub_a_b[0] = combiner_rgbsub_a_b[1] = &one_color;
@@ -6024,9 +6019,9 @@ void deduce_derivatives()
   other_modes.f.rgb_alpha_dither = (other_modes.rgb_dither_sel << 2) | other_modes.alpha_dither_sel;
 
   if (other_modes.rgb_dither_sel == 3)
-    rgb_dither_ptr = rgb_dither_func[1];
+    rgb_dither_ptr = DitherFuncLUT[1];
   else
-    rgb_dither_ptr = rgb_dither_func[0];
+    rgb_dither_ptr = DitherFuncLUT[0];
 
   tcdiv_ptr = tcdiv_func[other_modes.persp_tex_en];
 
@@ -7143,55 +7138,6 @@ static void calculate_tile_derivs(uint32_t i)
   tile[i].f.masktclamped = tile[i].mask_t <= 10 ? tile[i].mask_t : 10;
   tile[i].f.notlutswitch = (tile[i].format << 2) | tile[i].size;
   tile[i].f.tlutswitch = (tile[i].size << 2) | ((tile[i].format + 2) & 3);
-}
-
-static void rgb_dither_complete(int* r, int* g, int* b, int dith)
-{
-  if ((*r & 7) > dith)
-  {
-    if (*r > 247)
-      *r = 255;
-    else
-      *r = (*r & 0xf8) + 8;
-  }
-  if (other_modes.rgb_dither_sel != 2)
-  {
-    if ((*g & 7) > dith)
-    {
-      if (*g > 247)
-        *g = 255;
-      else
-        *g = (*g & 0xf8) + 8;
-    }
-    if ((*b & 7) > dith)
-    {
-      if (*b > 247)
-        *b = 255;
-      else
-        *b = (*b & 0xf8) + 8;
-    }
-  }
-  else
-  {
-    if ((*g & 7) > ((dith + 3) & 7))
-    {
-      if (*g > 247)
-        *g = 255;
-      else
-        *g = (*g & 0xf8) + 8;
-    }
-    if ((*b & 7) > ((dith + 5) & 7))
-    {
-      if (*b > 247)
-        *b = 255;
-      else
-        *b = (*b & 0xf8) + 8;
-    }
-  }
-}
-
-static void rgb_dither_nothing(int* r, int* g, int* b, int dith)
-{
 }
 
 static void get_dither_noise_complete(int x, int y, int* cdith, int* adith)
