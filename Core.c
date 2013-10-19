@@ -383,7 +383,6 @@ static void get_nexttexel0_2cycle(int32_t* s1, int32_t* t1, int32_t s, int32_t t
 static void calculate_clamp_diffs(uint32_t tile);
 static void calculate_tile_derivs(uint32_t tile);
 static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, int* z, uint32_t curpixel_cvg);
-uint32_t vi_integer_sqrt(uint32_t a);
 void deduce_derivatives(void);
 
 static int32_t k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0;
@@ -7125,26 +7124,6 @@ static void rgbaz_correct_clip(int offx, int offy, int r, int g, int b, int a, i
 
   zanded = (sz & 0x00060000) >> 17;
   *z = (sz & zandtable[zanded]) | zortable[zanded];
-}
-
-uint32_t vi_integer_sqrt(uint32_t a)
-{
-  unsigned long op = a, res = 0, one = 1 << 30;
-
-    while (one > op) 
-    one >>= 2;
-
-    while (one != 0) 
-  {
-        if (op >= res + one) 
-    {
-            op -= res + one;
-            res += one << 1;
-        }
-        res >>= 1;
-        one >>= 2;
-    }
-    return res;
 }
 
 static void tcdiv_nopersp(int32_t ss, int32_t st, int32_t sw, int32_t* sss, int32_t* sst)
