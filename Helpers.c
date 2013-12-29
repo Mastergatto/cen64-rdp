@@ -108,26 +108,6 @@ ASR8ClearLow(int32_t *dest, const int32_t *src) {
 }
 
 /* ============================================================================
- *  BroadcastInt: Broadcasts an integer to all slices of a vector.
- * ========================================================================= */
-__m128i
-BroadcastInt(int32_t constant) {
-  __m128i constantVector;
-  __m128i shuffleKey;
-
-  static const uint8_t ShuffleData[16] align(16) = {
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-    0x0,0x1,0x2,0x3,
-  };
-
-  constantVector = _mm_loadu_si128((__m128i*) &constant);
-  shuffleKey = _mm_load_si128((__m128i*) ShuffleData);
-  return _mm_shuffle_epi8(constantVector, shuffleKey);
-}
-
-/* ============================================================================
  *  ClearLow5: Clears the least significant 5 bits within a vector.
  * ========================================================================= */
 void
@@ -333,7 +313,7 @@ MulConstant(int32_t *dest, int32_t *src, int32_t constant) {
   __m128i constantVector;
   __m128i src1, src2;
 
-  constantVector = BroadcastInt(constant);
+  constantVector = _mm_set1_epi32(constant);
   src1 = _mm_load_si128((__m128i*) (src + 0));
   src2 = _mm_load_si128((__m128i*) (src + 4));
   src1 = _mm_mullo_epi32(src1, constantVector);
